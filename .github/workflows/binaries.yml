@@ -237,6 +237,7 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
+            dist/*.crate
             dist/*.sha256
           if-no-files-found: error
       # Releases are rare and their compiler caches are large, so none is saved:
