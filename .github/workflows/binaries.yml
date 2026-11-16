@@ -185,3 +185,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+      # Mesh-LLM/mesh-packaging builds the packages, container images and npm
+      # release from a published stable release. Skipped without its token.
+      - name: Tell mesh-packaging about a stable release
+        if: ${{ !contains(env.VERSION, '-') }}
+        env:
+          GH_TOKEN: ${{ secrets.MESH_AGENT_IMAGES_DISPATCH_TOKEN }}
+        run: |
+          [[ -n "$GH_TOKEN" ]] || { echo "No mesh-packaging token is configured; skipping."; exit 0; }
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg ref "$VERSION" --arg version "${VERSION#v}" \
+            --arg sha "$(git rev-parse "$VERSION^{commit}")" \
+            --arg manifest "$(sha256sum dist/native-runtimes.json | awk '{print $1}')" \
+            --arg id "mesh-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            '{event_type: "mesh-llm-release", client_payload: {repository: $repository, ref: $ref,
+              version: $version, expected_mesh_sha: $sha, expected_manifest_sha256: $manifest,
+              correlation_id: $id, dry_run: false, publish_images: true,
+              publish_release_assets: true, publish_npm: true}}' |
+            gh api --method POST repos/Mesh-LLM/mesh-packaging/dispatches --input -
