@@ -99,7 +99,7 @@ release-build-cuda:
       arches='61;75;80;86;87;89;90'
     fi
     MESH_LLM_CUDA_TOOLKIT_MAJOR="${MESH_LLM_CUDA_TOOLKIT_MAJOR:-$major}" \
-      LLAMA_STAGE_CUDA_ARCHITECTURES="$arches" \
+      LLAMA_STAGE_CUDA_ARCHITECTURES="${LLAMA_STAGE_CUDA_ARCHITECTURES:-$arches}" \
       scripts/package-native-runtime.sh --build --backend cuda --target x86_64-unknown-linux-gnu
     just skippy-cli-release-build
     just release-host-build
