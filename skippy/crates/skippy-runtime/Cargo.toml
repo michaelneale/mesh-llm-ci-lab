@@ -18,11 +18,11 @@ test-support = []
 crossbeam-queue.workspace = true
 anyhow.workspace = true
 hex = "0.4"
-skippy-ffi = { path = "../skippy-ffi", version = "0.80.1", default-features = false  }
-skippy-cache = { path = "../skippy-cache", version = "0.80.1" }
-skippy-model = { path = "../skippy-model", version = "0.80.1" }
-skippy-model-ref = { path = "../skippy-model-ref", version = "0.80.1" }
-skippy-package-format = { path = "../skippy-package-format", version = "0.80.1" }
+skippy-ffi = { path = "../skippy-ffi", version = "0.80.2-rc.2", default-features = false  }
+skippy-cache = { path = "../skippy-cache", version = "0.80.2-rc.2" }
+skippy-model = { path = "../skippy-model", version = "0.80.2-rc.2" }
+skippy-model-ref = { path = "../skippy-model-ref", version = "0.80.2-rc.2" }
+skippy-package-format = { path = "../skippy-package-format", version = "0.80.2-rc.2" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

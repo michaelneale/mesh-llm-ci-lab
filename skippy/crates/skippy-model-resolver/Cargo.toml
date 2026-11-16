@@ -10,8 +10,8 @@ readme = "README.md"
 
 [dependencies]
 anyhow.workspace = true
-skippy-model-ref = { path = "../skippy-model-ref", version = "0.80.1"  }
-skippy-model-artifact = { path = "../skippy-model-artifact", version = "0.80.1"  }
+skippy-model-ref = { path = "../skippy-model-ref", version = "0.80.2-rc.2"  }
+skippy-model-artifact = { path = "../skippy-model-artifact", version = "0.80.2-rc.2"  }
 serde.workspace = true
 serde_json.workspace = true
 
