@@ -22,6 +22,6 @@ mesh_automation() {
         fi
         "$automation_binary" "$@"
     else
-        env HOME="$MESH_AUTOMATION_DISCOVERY_HOME" just --justfile "$REPO_ROOT/Justfile" automation-run "$@"
+        env HOME="$MESH_AUTOMATION_DISCOVERY_HOME" cargo run --locked --quiet --manifest-path "$REPO_ROOT/Cargo.toml" -p xtask -- "$@"
     fi
 }

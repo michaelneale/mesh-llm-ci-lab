@@ -99,10 +99,7 @@ jobs:
         with:
           cache: clippy
           components: clippy
-      - run: cargo clippy --locked --keep-going --workspace --exclude skippy-ffi --exclude xtask --all-targets -- -D warnings
-      # xtask's own tests assert the workflows this CI replaced, so only the
-      # tool itself is linted until those tests are removed.
-      - run: cargo clippy --locked -p xtask -- -D warnings
+      - run: cargo clippy --locked --keep-going --workspace --exclude skippy-ffi --all-targets -- -D warnings
       - if: ${{ !cancelled() }}
         uses: ./.github/actions/save-build-cache
 

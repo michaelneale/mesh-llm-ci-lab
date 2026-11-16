@@ -182,10 +182,6 @@ skippy-native-full-replay backend="cpu":
     scripts/prepare-llama.sh pinned
     LLAMA_STAGE_BACKEND="{{ backend }}" LLAMA_STAGE_LINK_MODE=static LLAMA_STAGE_BUILD_DIR="$PWD/.deps/llama-build/build-stage-full-replay-static-{{ backend }}" LLAMA_STAGE_FULL_REPLAY=ON LLAMA_STAGE_FORCE_BUILD=1 scripts/build-llama.sh
 
-# Generate a pinned native corpus; use a fresh --out-root to regenerate an existing tier.
-bench-corpus tier="smoke" *ARGS="":
-    just with-lld cargo run --locked -p trajectory-reader --features corpus-input --bin trajectory-reader -- corpus "{{ tier }}" {{ ARGS }}
-
 # Run skippy family certification checks.
 family-certify *ARGS:
     just with-lld scripts/family-certify.sh {{ ARGS }}
@@ -224,20 +220,9 @@ layer-job-helper-release-build:
 competitive-inputs-helper-build:
     just with-lld cargo build --locked -p skippy-model-package --bin model-package-competitive-inputs
 
-competitive-inputs-prefetch request helper helper_sha256 reader reader_sha256 evidence timeout="3600":
-    cargo xtool automation replay-matrix competitive-inputs-prefetch --request "{{ request }}" --helper "{{ helper }}" --helper-sha256 "{{ helper_sha256 }}" --evidence-directory "{{ evidence }}" --timeout-seconds "{{ timeout }}" --reader "{{ reader }}" --reader-sha256 "{{ reader_sha256 }}"
-
-# Private finite full-chain positive; xtask must be freshly built from this same source.
-competitive-inputs-prefetch-fixture xtask:
-    COMPETITIVE_FIXTURE_XTASK_BIN="{{ xtask }}" just with-lld cargo test --locked -p skippy-model-package --lib competitive_acquisition::full_frontend::actual_full_native_prefetch_acquires_four_families_exports_and_generates_manifest_and_readerless_skips -- --exact --ignored --nocapture
-
 # Native pinned checkpoint staging helper; no model/native build is included.
 mtp-checkpoint-helper-build:
     just with-lld cargo build --locked -p skippy-model-package --bin model-package-mtp-checkpoint
-
-# Typed immutable checkpoint/bootstrap/native composition/publication owner.
-hf-skippy-mtp-compose-default input output:
-    cargo xtool automation hf-certify compose-default --input "{{input}}" --output-directory "{{output}}"
 
 # Isolated native generic conversion Jobs facade; explicit submit authority remains required.
 generic-conversion-jobs-release-build:
@@ -283,14 +268,6 @@ skippy-layer-package-fetch *ARGS:
     just with-lld cargo build --quiet --locked -p skippy-package-builder --features skippy-runtime/dynamic-native-runtime
     exec cargo run --quiet --locked -p skippy-package-builder --features skippy-runtime/dynamic-native-runtime -- fetch-layer-package "$@"
 
-# Qualify Decisions HTTP responses from an already running System One model.
-[unix]
-[positional-arguments]
-decisions-smoke *ARGS:
-    @just automation-run automation decisions-smoke "$@"
-
-
-
 # --- skippy_api recipes ------------------------------------------------------
 
 skippy-llama-api-test:
@@ -320,23 +297,6 @@ skippy-llama-api-bench:
       --benchmark_min_time=0.5s \
       --benchmark_repetitions=5 \
       --benchmark_report_aggregates_only=true
-
-# Same benchmark, but print the old-vs-new speedup table instead of raw rows.
-[unix]
-[positional-arguments]
-skippy-llama-api-ffi-bench-compare model="" *ARGS="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    model="$1"
-    shift
-    while [[ $# -gt 0 && -z "$1" ]]; do shift; done
-    report="$(mktemp "${TMPDIR:-/tmp}/skippy-ffi-vs-api.XXXXXX")"
-    trap 'rm -f "$report"' EXIT
-    just skippy-llama-api-ffi-bench "$model" \
-      --benchmark_format=json \
-      --benchmark_out="$report" \
-      "$@" >/dev/null
-    just automation-run automation skippy-benchmark-compare "$report"
 
 # Stage planner probe: proves a GGUF is a valid single-shard package and prints
 # what planning costs. Optional layer count and [start, end) stage range.
@@ -502,78 +462,6 @@ skippy-api-all-targets-build:
         -DSKIPPY_BUILD_LLAMA=OFF \
         -DSKIPPY_API_BUILD_FUZZERS=ON >/dev/null
     cmake --build target/skippy-api-fuzz --parallel
-
-# Run one A/B case from the patch manifest (list cases with no argument).
-[unix]
-[positional-arguments]
-skippy-ab case="" model="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    manifest="skippy/skippy_api/benchmarks/cases.txt"
-    if [ -z "{{ case }}" ]; then
-        awk -F'\t' '!/^#/ && NF>=5 {printf "%-4s %-2s %-24s %-18s %s\n", $1, $2, $3, $5, $6}' "$manifest"
-        exit 0
-    fi
-    row=$(awk -F'\t' -v want="{{ case }}" '!/^#/ && $3==want {print; exit}' "$manifest")
-    if [ -z "$row" ]; then
-        echo "no such case: {{ case }}" >&2
-        exit 1
-    fi
-    filter=$(printf '%s' "$row" | cut -f4)
-    expected=$(printf '%s' "$row" | cut -f5)
-    note=$(printf '%s' "$row" | cut -f6)
-    if [ "$expected" = "pending" ]; then
-        echo "{{ case }}: pending${note:+ — $note}"
-        exit 0
-    fi
-    if [ "$expected" = "blocked-upstream" ]; then
-        echo "{{ case }}: blocked-upstream${note:+ — $note}"
-        echo "  work belongs in skippy/llama_cpp/patches, not in skippy_api (see AGENTS.md)"
-        exit 0
-    fi
-    case "$1" in
-        batch_build_*|normalize_*|sampling_*) model_required=false ;;
-        *) model_required=true ;;
-    esac
-    if [ "$model_required" = true ] && [ -z "${2-}" ]; then
-        echo "{{ case }} needs a model: just skippy-ab {{ case }} <model.gguf>" >&2
-        exit 1
-    fi
-    out=$(mktemp "${TMPDIR:-/tmp}/skippy-ab.XXXXXX")
-    log="${out}.log"
-    trap 'rm -f "$out"' EXIT
-    # The recipe builds what it runs: a benchmark binary nobody else builds is
-    # how the stage_plan typo hid for a week (TYPE-RULES §6).
-    build_dir="${SKIPPY_LLAMA_API_FFI_BENCH_BUILD_DIR:-target/skippy-llama-api-ffi-bench}"
-    cmake -S skippy/skippy_api -B "$build_dir" -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release -DSKIPPY_BUILD_LLAMA=ON \
-        -DSKIPPY_LLAMA_SOURCE_DIR="{{absolute_path(llama_dir)}}" \
-        -DSKIPPY_API_BUILD_BENCHMARKS=ON -DSKIPPY_API_BUILD_FFI_BENCHMARKS=ON \
-        -DBENCHMARK_ENABLE_WERROR=OFF -DBENCHMARK_ENABLE_TESTING=OFF >/dev/null
-    cmake --build "$build_dir" --target skippy_api_ffi_benchmarks --parallel
-    if ! SKIPPY_BENCH_MODEL="${2-}" \
-        "$build_dir/skippy_api_ffi_benchmarks" \
-        --benchmark_filter="$filter" \
-        --benchmark_min_time=0.3s --benchmark_repetitions=15 \
-        --benchmark_enable_random_interleaving=true \
-        --benchmark_format=json --benchmark_out="$out" >"$log" 2>&1; then
-        echo "{{ case }}: benchmark exited non-zero (log: $log); last output:" >&2
-        tail -20 "$log" >&2
-        exit 1
-    fi
-    # A filter that matches no registered benchmark leaves the report empty
-    # with exit 0 (google benchmark writes nothing in that case), so check
-    # before the comparison script sees it.
-    if [ ! -s "$out" ]; then
-        echo "{{ case }}: filter '$filter' matched no benchmark; report is empty" >&2
-        echo "  registered names ending in /real_time come from ->UseRealTime();" >&2
-        echo "  manifest filters must prefix-match, never \$-anchor" >&2
-        echo "  benchmark log: $log; last output:" >&2
-        tail -20 "$log" >&2
-        exit 1
-    fi
-    just automation-run automation skippy-benchmark-compare "$out" | sed "s/^/  /"
-    echo "{{ case }}: acceptance=$expected (benchmark output: $log)"
 
 # Run the old C ABI against the skippy_api facade on one model (model=<gguf>).
 [unix]

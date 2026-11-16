@@ -79,8 +79,6 @@ members = [
     "tools/authority-automation",
     "tools/ci-controller",
     "tools/process-supervision",
-    "tools/runner-cleanup",
-    "tools/trajectory-reader",
 ]
 default-members = [
     "mesh/crates/mesh-llm",

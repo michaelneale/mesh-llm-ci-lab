@@ -78,7 +78,8 @@ fn malformed_sources_fail_closed() {
 
 #[test]
 fn exempt_crates_are_not_in_shipping_dependency_graph() {
-    check_exempt_crates(&crate::repo_consistency::repo_root().unwrap()).unwrap();
+    let root = crate::repository::RepositoryRoot::resolve(None).unwrap();
+    check_exempt_crates(root.as_path()).unwrap();
 }
 
 fn metadata_with_dependency(kind: Option<&str>) -> CargoMetadata {

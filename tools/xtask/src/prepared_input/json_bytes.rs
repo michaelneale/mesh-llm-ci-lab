@@ -2,18 +2,6 @@
 
 use crate::ci_plan::document::Json;
 use crate::ci_plan::plan_bytes::write_string;
-use std::path::Path;
-
-/// Reads and parses a JSON file with filesystem and JSON diagnostics.
-pub(crate) fn load(path: &Path) -> Result<Json, String> {
-    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
-    let text = std::str::from_utf8(&bytes).map_err(|error| error.to_string())?;
-    Json::parse(text.as_bytes()).map_err(|error| error.to_string())
-}
-
-pub(crate) fn equal(left: &Json, right: &Json) -> bool {
-    left.to_value() == right.to_value()
-}
 
 /// Stable sorted, ASCII-escaped manifest bytes with two-space indentation.
 pub(crate) fn dumps_indented(value: &Json) -> String {
@@ -82,32 +70,5 @@ mod tests {
             dumps_indented(&value),
             "{\n  \"a\": {\n    \"\\u00e9\": []\n  },\n  \"b\": [\n    1,\n    {}\n  ]\n}"
         );
-    }
-
-    #[test]
-    fn structural_comparison_ignores_object_key_order() {
-        assert!(equal(
-            &parsed(r#"{"a": 1, "b": true}"#),
-            &parsed(r#"{"b": true, "a": 1}"#)
-        ));
-    }
-
-    #[test]
-    fn structural_comparison_rejects_different_json_types() {
-        assert!(!equal(&parsed("true"), &parsed("1")));
-        assert!(!equal(&parsed("1"), &parsed("1.0")));
-        assert!(!equal(&parsed(r#"{"a": 1}"#), &parsed(r#"{"a": "1"}"#)));
-        assert!(!equal(
-            &parsed(r#"{"a": 1}"#),
-            &parsed(r#"{"a": 1, "b": 2}"#)
-        ));
-    }
-
-    #[test]
-    fn structural_comparison_preserves_integer_precision() {
-        assert!(!equal(
-            &parsed("9007199254740992"),
-            &parsed("9007199254740993")
-        ));
     }
 }

@@ -1,81 +1,5 @@
 # ── Full Validation Gate ───────────────────────────────────────
 
-# Populate the trusted Linux compiler-object seed with the dominant Clippy,
-# release-host, isolated test, and automation Clippy graphs used by CI jobs.
-[linux]
-ci-sccache-seed-build:
-    cargo clippy --locked -p mesh-llm --all-targets -- -D warnings
-    cargo build --release --locked -p mesh-llm --bin mesh-llm --no-default-features --features web-ui,dynamic-native-runtime
-    CARGO_PROFILE_TEST_DEBUG=0 cargo test --locked -p mesh-llm-cli --no-run
-    cargo clippy --locked -p xtask --all-targets -- -D warnings
-
-# Validate CI definitions, planner fixtures, and repository consistency.
-ci-validate:
-    actionlint -config-file .github/actionlint.yaml
-    git diff --check
-    just ci-automation-contracts
-    just ci-legacy-contracts
-    just ci-crate-lists
-    just check-release
-    just no-console-print
-    just publish-crates
-
-# Required native ownership for the former Windows Python contract modules.
-# The ordered quality caller retains this recipe; actual Windows execution stays in
-# the existing selected Windows unit workflow (21 methods plus wrapper1).
-ci-legacy-contracts:
-    just with-lld cargo test --locked -p xtask --bin xtask ci_validation::windows_runtime::tests:: -- --test-threads=1
-    just with-lld cargo test --locked -p xtask --features automation-contracts --test ci_runner_cache_contract windows_ -- --test-threads=1
-    just with-lld cargo test --locked -p xtask --features automation-contracts --test migration_lifecycle windows_ -- --test-threads=1
-
-# Native whole-session cohort fixtures use the pinned Parquet reader and codecs.
-agentic-trajectory-reader-contracts:
-    just with-lld cargo test --locked -p trajectory-reader --features parquet-input --lib cohorts:: -- --test-threads=1
-
-# Run CI/workspace crate-list consistency checks.
-ci-crate-lists:
-    just with-lld cargo run -p xtask -- repo-consistency ci-crate-lists
-
-# Build only the xtask automation tool, then prove it is Cargo's target output
-# with no product/native/UI dependency (no llama.cpp or UI preparation).
-automation-bootstrap:
-    just with-lld cargo build --locked -p xtask --bin xtask
-    just with-lld cargo run --locked -p xtask --bin xtask -- automation bootstrap
-
-# Build only the narrow CI controller (planning, lane admission, planner-side
-# repository checks), then prove no other workspace crate was compiled in.
-ci-controller-bootstrap:
-    just with-lld cargo build --locked -p ci-controller --bin ci-controller
-    just with-lld cargo run --locked -p ci-controller --bin ci-controller -- automation bootstrap
-
-# Build only the narrow authority automation executable the protected authority
-# producers publish, then prove only the controller library was compiled in.
-authority-automation-bootstrap:
-    just with-lld cargo build --locked -p authority-automation --bin authority-automation
-    just with-lld cargo run --locked -p authority-automation --bin authority-automation -- automation bootstrap
-
-# Build only the narrow runner-cleanup executable the trusted runner-image job
-# freezes for cleanup, then prove only the controller and supervision libraries
-# were compiled in.
-runner-cleanup-bootstrap:
-    just with-lld cargo build --locked -p runner-cleanup --bin runner-cleanup
-    just with-lld cargo run --locked -p runner-cleanup --bin runner-cleanup -- automation bootstrap
-
-[private]
-[unix]
-[positional-arguments]
-automation-run *ARGS:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    bootstrap="$(just automation-bootstrap)"
-    binary="$(printf '%s\n' "$bootstrap" | awk -F= '$1 == "binary_path" { print substr($0, index($0, "=") + 1) }')"
-    test -n "$binary"
-    exec "$binary" "$@"
-
-# Run crates.io publish-chain consistency checks.
-publish-crates:
-    just with-lld cargo run -p xtask -- repo-consistency publish-crates
-
 # Gate on println!/eprintln!/print!/eprint! and direct io::stdout()/io::stderr()
 # handles in Rust files under crates/ (excluding tests, non-product crates, helper
 # bins and build.rs). There is no allowlist: route output through mesh-llm-events.
@@ -101,19 +25,6 @@ research-source-restore:
     git -C "$target" fetch --quiet --depth 1 origin "$revision"
     git -C "$target" checkout --quiet --detach "$revision"
 
-# Admit the immutable research checkout, restoring it only for local runs that
-# have not received the CI-prepared source environment.
-[private]
-research-source-admit binary:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    automation_bin={{binary}}
-    if [[ -z "${MESH_PYTHON_RESEARCH_SOURCE:-}" ]]; then
-        just research-source-restore
-        export MESH_PYTHON_RESEARCH_SOURCE="$PWD/.sdk-source/research"
-    fi
-    "$automation_bin" automation smoke-observation research-source --kind root
-
 # Run all checks: repo consistency, Rust tests, author exemplars, fmt, clippy, UI/docs builds, and E2E smoke.
 test-all:
     #!/usr/bin/env bash
@@ -125,11 +36,7 @@ test-all:
         just research-source-restore
         export MESH_PYTHON_RESEARCH_SOURCE="$PWD/.sdk-source/research"
     fi
-    MESH_PYTHON_RESEARCH_SOURCE="$(just with-lld cargo xtool automation smoke-observation research-source --kind root)"
     export MESH_PYTHON_RESEARCH_SOURCE
-
-    echo "=== 0/11 Test-all rust crate coverage preflight ==="
-    just with-lld cargo run -p xtask -- repo-consistency test-all-rust-crate-coverage
 
     # A full workspace gate otherwise leaves hundreds of incompatible
     # incremental feature graphs behind. CI already builds non-incrementally;
@@ -158,10 +65,6 @@ test-all:
     echo ""
 
     # Each UI step runs in a subshell so cd doesn't leak between steps.
-    echo "=== 1/11 Repo consistency ==="
-    just with-lld cargo run -p xtask -- repo-consistency ci-crate-lists
-    just with-lld cargo run -p xtask -- repo-consistency publish-crates
-    echo ""
     echo "=== 2/11 Rust format check ==="
     just with-lld cargo fmt --all -- --check
     echo ""
@@ -235,166 +138,3 @@ test-all:
     (cd "{{ ui_dir }}" && pnpm run test:e2e)
     echo ""
     echo "All checks passed."
-
-# Portable automation contracts replace accepted legacy test intentions.
-# Build only xtask and its inert fixture binaries/examples before serial tests.
-ci-automation-contracts:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    repo_root="$(pwd -P)"
-    export MESH_PYTHON_SDK_SOURCE="$repo_root/mesh/sdk/python"
-    command -v node >/dev/null 2>&1 || { echo "ci-automation-contracts requires the Node component for finite local action fixtures; install Node before this required gate." >&2; exit 1; }
-    bootstrap="$(just automation-bootstrap)"
-    binary="$(printf '%s\n' "$bootstrap" | awk -F= '$1 == "binary_path" { count++; print substr($0, index($0, "=") + 1) } END { if (count != 1) exit 1 }')"
-    target_directory="$(printf '%s\n' "$bootstrap" | awk -F= '$1 == "target_directory" { count++; print substr($0, index($0, "=") + 1) } END { if (count != 1) exit 1 }')"
-    test -n "$binary"
-    test -n "$target_directory"
-    export CARGO_TARGET_DIR="$target_directory"
-    "$binary" automation smoke-observation sdk-source --kind root >/dev/null
-    # CI prepares this separate research fixture in a preceding workflow step;
-    # local contract runs restore and admit the same immutable source here.
-    MESH_PYTHON_RESEARCH_SOURCE="$(just research-source-admit "$binary")"
-    export MESH_PYTHON_RESEARCH_SOURCE
-    just with-lld cargo build --locked -p xtask --bins --examples
-    # Codec and corpus contracts run after the native-library-free bootstrap;
-    # their fixtures use local pinned data and do not acquire HF datasets.
-    just with-lld cargo build --locked -p trajectory-reader --features corpus-input --bin trajectory-reader
-    just with-lld cargo test --locked -p trajectory-reader --features corpus-input --lib -- --test-threads=1
-    MESH_LLM_TEST_XTASK_BIN="$binary" just with-lld cargo test --locked -p trajectory-reader --features corpus-input --test prompt_command native_prompt_command_ -- --test-threads=1
-    # The narrow controller, authority, supervision, and cleanup crates are contract-tested
-    # here, not in the Rust test matrix. Supervision and cleanup tests keep xtask's
-    # single-threaded harness.
-    just with-lld cargo test --locked -p ci-controller
-    just with-lld cargo test --locked -p authority-automation
-    just with-lld cargo test --locked -p process-supervision -- --test-threads=1
-    just with-lld cargo test --locked -p runner-cleanup -- --test-threads=1
-    fixture_suffix=""
-    case "$binary" in *.exe) fixture_suffix=".exe" ;; esac
-    # Examples sit beside the bootstrap binary in its profile directory, which is
-    # <target>/<host>/debug when the build names the host triple.
-    export SPV_ADAPTER_FIXTURE="${binary%[/\\]*}/examples/swift_privacy_lint_fixture$fixture_suffix"
-    git_path="${MIGRATION_TEST_GIT-$(command -v git)}"
-    if command -v cygpath >/dev/null 2>&1; then
-        git_path="$(cygpath -w "$git_path")"
-        test -f "$(cygpath -u "$SPV_ADAPTER_FIXTURE")"
-        test -x "$(cygpath -u "$SPV_ADAPTER_FIXTURE")"
-    else
-        test -f "$SPV_ADAPTER_FIXTURE"
-        test -x "$SPV_ADAPTER_FIXTURE"
-    fi
-    export MIGRATION_TEST_GIT="$git_path"
-    export GIT_MASTER=1 GIT_OPTIONAL_LOCKS=0
-    just ci-snapshot-promotion-contracts
-    just with-lld cargo test --locked -p xtask --features automation-contracts --bin xtask \
-        --test automation_selector \
-        --test canary_cache_configuration \
-        --test canary_controller_plan \
-        --test canary_result_gate \
-        --test ci_runner_cache_contract \
-        --test family_battery_environment \
-        --test family_battery_prepared_source \
-        --test l4_producers \
-        --test lane_l11_optional_tooling \
-        --test lane_l12_build_llama \
-        --test lane_l1_ui_delivery \
-        --test lane_l2_authority \
-        --test lane_l2_hosted_bootstrap \
-        --test lane_l2_quality_contracts \
-        --test lane_l2_registry_pulls \
-        --test lane_l2_runtime_lifecycle \
-        --test lane_l2_runtime_seed \
-        --test lane_l3_abi_restore \
-        --test lane_l3_cache_metadata \
-        --test lane_l3_display_projection \
-        --test lane_l3_l2_dispatch \
-        --test lane_l5_adapter_contracts \
-        --test lane_l5_release_product \
-        --test lane_l6_sdk_swift \
-        --test lane_l7_control_plane \
-        --test lane_l7_daemon_lifecycle \
-        --test lane_l7_logging_console \
-        --test lane_l7_logging_recovery \
-        --test lane_l7_plans \
-        --test lane_l7_sdk_fixture \
-        --test lane_l7_split_recovery \
-        --test lane_l7_standalone \
-        --test lane_l8_smoke \
-        --test laya_cli_fixture \
-        --test local_ports \
-        --test migration_archives \
-        --test migration_bootstrap \
-        --test migration_canary_aggregate_cli \
-        --test migration_canary_receipts \
-        --test migration_canary_receipts_parity \
-        --test migration_cargo_metadata \
-        --test migration_cargo_packages_cli \
-        --test migration_ci_graph \
-        --test migration_ci_operations \
-        --test migration_ci_plan \
-        --test migration_cli \
-        --test migration_family_plan \
-        --test migration_hf_artifact_cli \
-        --test migration_hf_artifact_controls \
-        --test migration_hf_converted_artifact \
-        --test migration_lifecycle \
-        --test migration_stability \
-        --test migration_models \
-        --test migration_native_fixtures \
-        --test migration_native_generator \
-        --test migration_native_policy \
-        --test migration_optional_observations \
-        --test migration_optional_isolation \
-        --test migration_package_source_version \
-        --test migration_patch_bytes \
-        --test migration_patch_shards \
-        --test migration_prepared_inputs \
-        --test migration_process \
-        --test migration_product \
-        --test migration_release \
-        --test migration_report_contract \
-        --test migration_report_safety \
-        --test migration_repository \
-        --test migration_run_family \
-        --test migration_workload_oracle_cli \
-        --test migration_xcframework_cli \
-        --test opencode_config_adapter \
-        --test opencode_fixture_evidence \
-        --test prepared_source \
-        --test release_inventory_evidence \
-        --test release_inventory_provenance \
-        --test release_inventory_publication \
-        --test replay_acceptance_gates \
-        --test replay_arm_pass \
-        --test replay_build_arm \
-        --test replay_context_preflight \
-        --test replay_external_engines \
-        --test replay_external_run \
-        --test replay_history \
-        --test replay_history_hub \
-        --test replay_interruption \
-        --test replay_l3 \
-        --test replay_manifest_preflight \
-        --test replay_manual_profile \
-        --test replay_manual_resume_refs \
-        --test replay_model_preflight \
-        --test replay_pass_schedule \
-        --test replay_pooled_rows \
-        --test replay_progress \
-        --test replay_publication_prepare \
-        --test replay_report \
-        --test replay_retirement \
-        --test replay_run_execution \
-        --test replay_server_cell \
-        --test replay_session_evidence \
-        --test replay_trajectory_execution \
-        --test swift_api_checksum \
-        --test swift_privacy_adapter \
-        --test swift_producer_environment \
-        --test workload_certify_contract \
-        --test workload_oracle_producer_contract \
-        --test workload_start_retry \
-        -- --test-threads=1
-
-# Native component owner and actual CLI, including the embedded job caller.
-ci-snapshot-promotion-contracts:
-    just with-lld cargo test --locked -p skippy-model-package --lib --test snapshot_promotion_cli -- --test-threads=1

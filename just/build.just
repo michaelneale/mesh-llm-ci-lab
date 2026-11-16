@@ -44,12 +44,12 @@ with-lld *COMMAND:
 # The MeshLLM host stays backend-neutral beside Skippy's packaged runtime.
 [macos]
 build backend="" cuda_arch="" rocm_arch="":
-    @just automation-run ci-ops build-cache build -- scripts/build-development-product.sh --backend "{{ backend }}" --cuda-arch "{{ cuda_arch }}" --rocm-arch "{{ rocm_arch }}"
+    @scripts/build-development-product.sh --backend "{{ backend }}" --cuda-arch "{{ cuda_arch }}" --rocm-arch "{{ rocm_arch }}"
 
 # Fast local iteration build: dynamic host + adjacent native runtime + UI.
 [macos]
 build-dev:
-    @just automation-run ci-ops build-cache build -- env MESH_LLM_BUILD_PROFILE=dev scripts/build-development-product.sh --profile dev
+    @MESH_LLM_BUILD_PROFILE=dev scripts/build-development-product.sh --profile dev
 
 # Linux overrides:
 #   just build backend=cpu
@@ -58,12 +58,12 @@ build-dev:
 # just build backend=vulkan
 [linux]
 build backend="" cuda_arch="" rocm_arch="":
-    @just automation-run ci-ops build-cache build -- scripts/build-development-product.sh --backend "{{ backend }}" --cuda-arch "{{ cuda_arch }}" --rocm-arch "{{ rocm_arch }}"
+    @scripts/build-development-product.sh --backend "{{ backend }}" --cuda-arch "{{ cuda_arch }}" --rocm-arch "{{ rocm_arch }}"
 
 # Fast local iteration build: dynamic host + adjacent native runtime + UI.
 [linux]
 build-dev backend="" cuda_arch="" rocm_arch="":
-    @just automation-run ci-ops build-cache build -- env MESH_LLM_BUILD_PROFILE=dev scripts/build-development-product.sh --profile dev --backend "{{ backend }}" --cuda-arch "{{ cuda_arch }}" --rocm-arch "{{ rocm_arch }}"
+    @MESH_LLM_BUILD_PROFILE=dev scripts/build-development-product.sh --profile dev --backend "{{ backend }}" --cuda-arch "{{ cuda_arch }}" --rocm-arch "{{ rocm_arch }}"
 
 # Windows overrides:
 #   just build backend=cpu
