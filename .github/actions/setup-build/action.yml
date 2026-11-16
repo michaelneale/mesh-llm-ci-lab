@@ -56,6 +56,8 @@ runs:
 
     # sccache keeps its cache in one directory, saved and restored as a single
     # Actions cache entry. Its per-object Actions backend is rate limited.
+    # GitHub keeps 10 GB of caches per repository, so each entry is capped and
+    # debug builds carry line tables only to keep the entries small.
     - name: Configure the compiler cache
       shell: bash
       env:
@@ -66,7 +68,8 @@ runs:
           echo "SCCACHE_DIR=$HOME/.cache/sccache-ci" >> "$GITHUB_ENV"
         fi
         {
-          echo "SCCACHE_CACHE_SIZE=4G"
+          echo "SCCACHE_CACHE_SIZE=1500M"
+          echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only"
           echo "RUSTC_WRAPPER=sccache"
           echo "CARGO_INCREMENTAL=0"
           echo "BUILD_CACHE_PREFIX=build-$RUNNER_OS-$RUNNER_ARCH-$CACHE-"
