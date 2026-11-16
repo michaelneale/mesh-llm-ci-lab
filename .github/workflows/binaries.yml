@@ -44,6 +44,10 @@ jobs:
           - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: CPU,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU }
+          # GitHub's runners have no NVIDIA card, so the CUDA archives are built
+          # and packaged here but not started.
+          - { name: Linux x86_64 CUDA 12, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 12-9 }
+          - { name: Linux x86_64 CUDA 13, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 13-1 }
     defaults:
       run:
         shell: bash
@@ -56,6 +60,22 @@ jobs:
           cache: ${{ matrix.recipe }}-${{ matrix.flavor || 'default' }}
           node: "true"
           packages: ${{ matrix.packages }}
+      - name: Install NVIDIA's CUDA toolkit
+        if: matrix.cuda
+        env:
+          KEYRING: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          KEYRING_SHA256: d2a6b11c096396d868758b86dab1823b25e14d70333f1dfa74da5ddaf6a06dba
+          CUDA: ${{ matrix.cuda }}
+        run: |
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/cuda-keyring.deb" "$KEYRING"
+          echo "$KEYRING_SHA256  $RUNNER_TEMP/cuda-keyring.deb" | sha256sum -c -
+          sudo dpkg -i "$RUNNER_TEMP/cuda-keyring.deb"
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends "cuda-toolkit-$CUDA"
+          echo /usr/local/cuda/bin >> "$GITHUB_PATH"
+          # Packaging names the archive after the toolkit's major version.
+          echo "MESH_LLM_CUDA_TOOLKIT_MAJOR=${CUDA%%-*}" >> "$GITHUB_ENV"
+          df -h /
       - name: Build the release binaries
         run: just ${{ matrix.recipe }}
       - name: Package the release archives
@@ -68,12 +88,14 @@ jobs:
           ls -l dist
           test -s "$(echo dist/meshllm-native-runtime-*.tar.gz)"
       - name: Restore the smoke model
+        if: matrix.device
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ runner.temp }}/models
           key: smoke-model-${{ hashFiles('ci/model-artifacts/manifests/product-smoke.json') }}
           enableCrossOsArchive: true
       - name: Unpack the archive and complete a chat request with it
+        if: matrix.device
         run: |
           archive="$(find dist -maxdepth 1 -type f -name "mesh-llm-$VERSION-*" ! -name '*.sha256')"
           mkdir -p "$RUNNER_TEMP/product"
