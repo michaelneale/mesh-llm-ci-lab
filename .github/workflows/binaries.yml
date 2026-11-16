@@ -36,8 +36,9 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    # A cold CUDA or ROCm build of llama.cpp takes two to three hours.
-    timeout-minutes: 300
+    # GitHub's limit for a job. A cold CUDA or ROCm build of llama.cpp takes two
+    # to three hours, and over four with CUDA 13 on Windows.
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:

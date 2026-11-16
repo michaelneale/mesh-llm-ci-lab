@@ -71,6 +71,16 @@ days, so this mostly helps a release candidate followed by its final release,
 and a release that is run again after a failure. The Windows build has no such
 skip and always compiles.
 
+The slowest platform is Windows CUDA 13: its llama.cpp build takes about four
+and a quarter hours on GitHub's standard Windows runner and the whole job a
+little over five, against GitHub's limit of six hours for a job. Windows CUDA 12
+takes about two hours. A release takes as long as that slowest job.
+
+The Windows CPU and Vulkan runtimes are built by
+`scripts/package-native-runtime.sh --build`, as on the other platforms; for
+Vulkan that means MinGW. The Windows CUDA and ROCm runtimes are built by
+`mesh/scripts/build-windows.ps1` with MSVC.
+
 Packaging signs `mesh-llm` and checks the signature when the
 `MESH_RELEASE_ATTESTATION_SIGNING_KEY_FILE` and
 `MESH_RELEASE_ATTESTATION_PUBLIC_KEY_FILE` secrets are set. Without them the
