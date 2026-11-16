@@ -44,6 +44,7 @@ jobs:
       matrix:
         include:
           - { name: Linux x86_64 CUDA 12, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 12-9,
+              cuda_archs: "61;75;80;86;87;89;90" }
           - { name: Linux x86_64 CUDA 13, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 13-1 }
           - { name: Linux arm64 CUDA 12, runner: ubuntu-24.04-arm, recipe: release-build-aarch64-cuda, flavor: cuda, cuda: 12-9 }
           - { name: Linux arm64 CUDA 13, runner: ubuntu-24.04-arm, recipe: release-build-aarch64-cuda, flavor: cuda, cuda: 13-1 }
