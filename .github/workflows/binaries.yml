@@ -157,6 +157,16 @@ jobs:
           printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/release-public-key.json"
           echo "MESH_RELEASE_ATTESTATION_SIGNING_KEY_FILE=$RUNNER_TEMP/release-signing-key.json" >> "$GITHUB_ENV"
           echo "MESH_RELEASE_ATTESTATION_PUBLIC_KEY_FILE=$RUNNER_TEMP/release-public-key.json" >> "$GITHUB_ENV"
+      # A CUDA or ROCm build of llama.cpp takes one to three hours. It is kept
+      # for the next release that has the same llama.cpp, patches and toolkit:
+      # build-llama.sh skips a build that is already there.
+      - name: Restore the GPU build of llama.cpp
+        if: matrix.cuda || matrix.rocm
+        id: llama
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .deps/llama-build
+          key: release-llama-${{ runner.arch }}-${{ matrix.flavor }}-${{ matrix.cuda || matrix.rocm }}-${{ matrix.cuda_archs }}-${{ hashFiles('skippy/llama_cpp/**', 'skippy/scripts/prepare-llama.sh', 'skippy/scripts/build-llama.sh', 'scripts/lib/**') }}
       - name: Build the release binaries
         env:
           # Empty lets the recipe choose from the installed toolkit.
@@ -167,6 +177,13 @@ jobs:
         run: |
           just ${{ matrix.recipe }}
           du -sh .deps/* || true
+      # A cache saved by a tag's run can only be read by that tag.
+      - name: Save the GPU build of llama.cpp
+        if: steps.llama.outcome == 'success' && steps.llama.outputs.cache-hit != 'true' && github.ref_type == 'branch'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .deps/llama-build
+          key: ${{ steps.llama.outputs.cache-primary-key }}
       - name: Package the release archives
         run: |
           runtimes=dist/native-runtimes

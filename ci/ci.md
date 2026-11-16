@@ -59,8 +59,15 @@ native runtime archives. The Swift framework is not built here.
 | Windows x86_64 | CPU, Vulkan, CUDA 12, CUDA 13, ROCm | CPU unpacked and answers a chat |
 
 The CUDA and ROCm archives are compiled and packaged but never started: GitHub's
-runners have no NVIDIA or AMD card. A cold CUDA or ROCm build of llama.cpp takes
-two to three hours. Nothing is published unless every platform succeeds.
+runners have no NVIDIA or AMD card. Nothing is published unless every platform
+succeeds.
+
+A CUDA or ROCm build of llama.cpp takes one to three hours. On Linux the built
+libraries are cached, so the next release with the same llama.cpp, patches and
+toolkit skips that build. GitHub drops a cache that has not been read for seven
+days, so this mostly helps a release candidate followed by its final release,
+and a release that is run again after a failure. The Windows build has no such
+skip and always compiles.
 
 Packaging signs `mesh-llm` and checks the signature when the
 `MESH_RELEASE_ATTESTATION_SIGNING_KEY_FILE` and
