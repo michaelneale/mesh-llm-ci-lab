@@ -271,7 +271,13 @@ jobs:
           # A version with a suffix, such as v1.2.3-rc.1, is a prerelease.
           prerelease=()
           [[ "$VERSION" != *-* ]] || prerelease=(--prerelease --latest=false)
-          gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}"
+          # The notes cover everything since the last stable release, so a
+          # release candidate's notes do not start at the candidate before it.
+          core="${VERSION%%-*}"
+          base="$(git ls-remote --tags --refs origin 'v[0-9]*' | sed 's|.*refs/tags/||' | grep -v -- - |
+            { cat; echo "$core"; } | sort -Vu | grep -B1 -x "$core" | grep -vx "$core" || true)"
+          gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+            ${base:+--notes-start-tag "$base"} "${prerelease[@]}"
       # Mesh-LLM/mesh-packaging builds the packages, container images and npm
       # release from a published stable release. Skipped without its token.
       - name: Tell mesh-packaging about a stable release
