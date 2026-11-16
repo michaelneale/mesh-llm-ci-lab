@@ -42,30 +42,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS arm64, runner: macos-15, recipe: release-build, device: MTL0 }
-          - { name: Linux x86_64, runner: ubuntu-24.04, recipe: release-build, device: CPU }
-          - { name: Linux arm64, runner: ubuntu-24.04-arm, recipe: release-build-aarch64, device: CPU }
-          - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: CPU,
-              packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU }
-          # GitHub's runners have no NVIDIA or AMD card, so the CUDA and ROCm
-          # archives are built and packaged here but not started.
-          - { name: Linux x86_64 CUDA 12, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 12-9,
-              cuda_archs: "61;75;80;86;87;89;90" }
-          - { name: Linux x86_64 CUDA 13, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 13-1 }
-          - { name: Linux arm64 CUDA 12, runner: ubuntu-24.04-arm, recipe: release-build-aarch64-cuda, flavor: cuda, cuda: 12-9 }
-          - { name: Linux arm64 CUDA 13, runner: ubuntu-24.04-arm, recipe: release-build-aarch64-cuda, flavor: cuda, cuda: 13-1 }
-          - { name: Linux x86_64 ROCm, runner: ubuntu-24.04, recipe: release-build-rocm, flavor: rocm, rocm: "7.0" }
-          - { name: Windows x86_64 Vulkan, runner: windows-2022, recipe: release-build-vulkan-windows, flavor: vulkan,
-              windows_vulkan: 1.4.328.1 }
-          - { name: Windows x86_64 CUDA 12, runner: windows-2022, recipe: 'release-build-cuda-windows "61;75;80;86;89;90"',
-              flavor: cuda, windows_cuda: 12.9.2,
-              cuda_packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]' }
-          - { name: Windows x86_64 CUDA 13, runner: windows-2022, recipe: 'release-build-cuda-windows "75;80;86;89;90;100;103;120"',
-              flavor: cuda, windows_cuda: 13.1.2,
-              cuda_packages: '["nvcc", "crt", "nvvm", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]' }
-          - { name: Windows x86_64 ROCm, runner: windows-2022, recipe: release-build-rocm-windows, flavor: rocm,
-              windows_rocm: AMD-Software-PRO-Edition-25.Q3-WinSvr2022-For-HIP.exe }
     defaults:
       run:
         shell: bash
