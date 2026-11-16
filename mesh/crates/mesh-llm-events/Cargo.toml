@@ -14,7 +14,7 @@ categories = ["command-line-interface"]
 workspace = true
 
 [dependencies]
-skippy-events = { path = "../../../skippy/crates/skippy-events", version = "0.80.1" }
+skippy-events = { path = "../../../skippy/crates/skippy-events", version = "0.80.2-rc.1" }
 anyhow.workspace = true
 clap.workspace = true
 crossterm = "0.29"

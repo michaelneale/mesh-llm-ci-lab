@@ -63,7 +63,7 @@ transition.
 
 A native runtime is identified by:
 
-- MeshLLM version, for example `0.80.1`
+- MeshLLM version, for example `0.80.2-rc.1`
 - Skippy ABI, for example `0.1.25`
 - target operating system and architecture
 - observed Linux glibc minimum, as `platform.min_glibc` when the artifact
@@ -426,7 +426,7 @@ Advanced users can pin runtime resolution in `~/.mesh-llm/config.toml`:
 
 ```toml
 [runtime.native_runtime]
-mesh_version = "0.80.1"
+mesh_version = "0.80.2-rc.1"
 selection = "exact:meshllm-native-runtime-linux-x86_64-cuda12"
 ```
 
