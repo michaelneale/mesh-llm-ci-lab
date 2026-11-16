@@ -2,8 +2,8 @@
 # packaged binary once, and attach the archives to a GitHub release.
 #
 # Each platform produces the MeshLLM archive, the native runtime archive that
-# MeshLLM downloads, and the Skippy CLI archive. The release also carries
-# native-runtimes.json, which lists the native runtime archives.
+# MeshLLM downloads, the Skippy CLI archive and the Node SDK addon. The release
+# also carries native-runtimes.json, which lists the native runtime archives.
 #
 # To release: `just release v1.2.3`. It starts this workflow, which sets that
 # version in the source, builds and tests the archives, and then commits the
@@ -106,8 +106,12 @@ jobs:
       - name: Package the release archives
         run: |
           just release-bundle "$VERSION" dist "${{ matrix.flavor }}"
-          # The Skippy CLI is the same for every flavour of a platform.
-          if [[ -z "${{ matrix.flavor }}" ]]; then ci/simple/package-skippy-cli.sh "$VERSION" dist; fi
+          # The Skippy CLI and the Node SDK addon are the same for every flavour
+          # of a platform.
+          if [[ -z "${{ matrix.flavor }}" ]]; then
+            ci/simple/package-skippy-cli.sh "$VERSION" dist
+            ci/simple/package-node-addon.sh "$VERSION" dist
+          fi
           # The native runtime archive was written by the build.
           find dist/native-runtimes -maxdepth 1 -type f -name 'meshllm-native-runtime-*.tar.gz*' -exec mv {} dist/ \;
           ls -l dist
