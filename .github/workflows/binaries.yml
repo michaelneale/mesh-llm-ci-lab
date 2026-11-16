@@ -172,6 +172,9 @@ jobs:
         env:
           # Empty leaves the choice to the recipe or, on arm64, to llama.cpp.
           LLAMA_STAGE_CUDA_ARCHITECTURES: ${{ matrix.cuda_archs }}
+          # A release job keeps no compiler cache, and sccache fails on nvcc
+          # with llama.cpp's own GPU list ('Missing "cubin" file output').
+          LLAMA_STAGE_USE_SCCACHE: "0"
           # Compiled into the binary so that it reports anonymous usage. A
           # build without the secret reports nothing.
           MESH_LLM_POSTHOG_KEY: ${{ secrets.MESH_LLM_POSTHOG_KEY }}
