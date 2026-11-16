@@ -32,9 +32,13 @@ release-runtime-build backend="" target="":
 [unix]
 release-build: release-runtime-build skippy-cli-release-build release-host-build
 
+# The published Windows CPU and Vulkan runtimes are built by the script the
+# other platforms use, not by build-windows.ps1; for Vulkan that means MinGW.
 [windows]
 release-build:
-    @powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Backend cpu -BuildProfile release -DynamicHost
+    @bash scripts/package-native-runtime.sh --build --backend cpu --target x86_64-pc-windows-msvc --out target/release/native-runtimes
+    @just skippy-cli-release-build
+    @just release-host-build
 
 # Build a Linux aarch64 CPU release artifact on a native aarch64 runner.
 release-build-aarch64:
@@ -113,4 +117,6 @@ release-build-vulkan:
     @just release-host-build
 
 release-build-vulkan-windows:
-    @powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Backend vulkan -BuildProfile release -DynamicHost
+    @bash scripts/package-native-runtime.sh --build --backend vulkan --target x86_64-pc-windows-msvc --out target/release/native-runtimes
+    @just skippy-cli-release-build
+    @just release-host-build
