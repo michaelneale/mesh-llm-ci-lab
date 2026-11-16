@@ -802,15 +802,12 @@ fn active_matches_filters(
     {
         return false;
     }
-    if query
+    let before_range = query
         .from
         .as_ref()
-        .is_some_and(|from| entry.created_at < *from)
-        || query.to.as_ref().is_some_and(|to| entry.created_at > *to)
-    {
-        return false;
-    }
-    true
+        .is_some_and(|from| entry.created_at < *from);
+    let after_range = query.to.as_ref().is_some_and(|to| entry.created_at > *to);
+    !(before_range || after_range)
 }
 
 fn mark_missing(mut record: ArtifactRecord) -> ArtifactRecord {
