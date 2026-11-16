@@ -26,6 +26,7 @@ fail() {
 # The model is listed once it has loaded; that is the state to wait for.
 for _ in $(seq 1 300); do
     kill -0 "$pid" 2>/dev/null || fail "mesh-llm exited before it was ready"
+    grep -q "^startup model .* failed" "$log" && fail "the model failed to load"
     if curl -fsS "http://127.0.0.1:$port/v1/models" 2>/dev/null | jq -e '.data | length > 0' >/dev/null 2>&1; then
         ready=1
         break

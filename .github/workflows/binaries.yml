@@ -33,7 +33,7 @@ jobs:
           - { name: macOS arm64, runner: macos-15, recipe: release-build, device: MTL0 }
           - { name: Linux x86_64, runner: ubuntu-24.04, recipe: release-build, device: CPU }
           - { name: Linux arm64, runner: ubuntu-24.04-arm, recipe: release-build-aarch64, device: CPU }
-          - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: Vulkan0,
+          - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: CPU,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU }
     defaults:

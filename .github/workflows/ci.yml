@@ -172,9 +172,9 @@ jobs:
       matrix:
         include:
           - { name: Linux CPU, runner: ubuntu-24.04, backend: cpu, device: CPU, binary: target/debug/mesh-llm }
-          # GitHub's Linux runners have no GPU; Mesa's software Vulkan driver
-          # (lavapipe) stands in, so the Vulkan backend really loads and runs.
-          - { name: Linux Vulkan, runner: ubuntu-24.04, backend: vulkan, device: Vulkan0, binary: target/debug/mesh-llm,
+          # GitHub's Linux runners have no GPU and MeshLLM does not use software
+          # Vulkan drivers, so the Vulkan build is started and answers on the CPU.
+          - { name: Linux Vulkan, runner: ubuntu-24.04, backend: vulkan, device: CPU, binary: target/debug/mesh-llm,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: macOS Metal, runner: macos-15, backend: metal, device: MTL0, binary: target/debug/mesh-llm }
           - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe }
