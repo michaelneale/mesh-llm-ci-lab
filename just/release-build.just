@@ -42,26 +42,15 @@ release-build-aarch64:
     @just skippy-cli-release-build
     @just release-host-build
 
-# Build a Linux aarch64 CUDA release artifact (Jetson/Orin).
-# SM arches selected by MESH_CUDA_VERSION env (set by CI matrix); a bare
-# `just` invocation with the var unset detects the installed toolkit instead
-# of assuming one (see scripts/detect-cuda-toolkit-version.sh); no compiler or
-# toolkit metadata is an actionable error. Thor (sm_110)
-# needs toolkit >= 13 -- gate on the major, the same shape as the x86_64
-# recipe's Blackwell gate, so a future CUDA 14 keeps Thor instead of falling
-# back to the pre-13 list the way a `13.*` glob did.
+# Build a Linux aarch64 CUDA release artifact. llama.cpp chooses the GPU
+# architectures to compile for, as it does in the published archives. Set
+# LLAMA_STAGE_CUDA_ARCHITECTURES to choose them, for example
+# '61;75;80;86;87;89;90' for Jetson Orin with CUDA 12.
 release-build-aarch64-cuda:
     #!/usr/bin/env bash
     set -euo pipefail
     cuda_version="$(scripts/detect-cuda-toolkit-version.sh)"
-    major="${cuda_version%%.*}"
-    if [[ "$major" -ge 13 ]]; then
-      arches='75;80;86;87;89;90;110'
-    else
-      arches='61;75;80;86;87;89;90'
-    fi
-    MESH_LLM_CUDA_TOOLKIT_MAJOR="${MESH_LLM_CUDA_TOOLKIT_MAJOR:-$major}" \
-      LLAMA_STAGE_CUDA_ARCHITECTURES="$arches" \
+    MESH_LLM_CUDA_TOOLKIT_MAJOR="${MESH_LLM_CUDA_TOOLKIT_MAJOR:-${cuda_version%%.*}}" \
       scripts/package-native-runtime.sh --build --backend cuda --target aarch64-unknown-linux-gnu
     just skippy-cli-release-build
     just release-host-build
