@@ -51,7 +51,7 @@ struct SingleDownloadFixture {
     sha256: String,
 }
 
-/// Read the selected fixture manifest generated from ci/model-artifacts/registry.json.
+/// Read the selected fixture manifest from ci/model-artifacts/manifests.
 fn download_fixture(id: &str) -> DownloadFixture {
     let default_manifest = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../ci/model-artifacts/manifests/hf-download-smoke.json");

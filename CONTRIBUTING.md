@@ -322,74 +322,28 @@ A squash merge builds the commit on `main` from the pull request title and
 body, both of which CI validates, so a trailer in a branch commit cannot reach
 `main` on its own. Keep them out of branch commits anyway: branch history is
 still read during review, and that protection is a repository setting rather
-than a law of nature. See the CI notes in
-[`.agents/skills/manage-ci/references/current-inventory.md`](.agents/skills/manage-ci/references/current-inventory.md).
+than a law of nature.
 
 
 ## CI / GitHub Actions
 
-For the current PR and main topology, read [`ci/ci.md`](ci/ci.md), the
-[optimization spec](.omo/specs/pr-ci-optimization.md), and the canonical
-[`manage-ci` skill](.agents/skills/manage-ci/SKILL.md) before editing CI.
-`.github/AGENTS.md` enforces that sequence.
+CI is one workflow, [`.github/workflows/ci.yml`](.github/workflows/ci.yml), on
+GitHub's own runners. [`ci/ci.md`](ci/ci.md) lists every job and the command it
+runs. A pull request runs its own copy of the workflow, and documentation-only
+changes skip the code jobs. `CI` is the one required check.
 
-The current five-way PR/main topology, manual controller, planner profiles,
-and runner/provider/cache policy are documented in [`ci/ci.md`](ci/ci.md),
-especially [Planner and profiles](ci/ci.md#planner-and-profiles) and [Provider
-and cache policy](ci/ci.md#provider-and-cache-policy). The normative rules for
-editing workflows and CI scripts live in the [`manage-ci` skill](.agents/skills/manage-ci/SKILL.md).
-
-When a pull request changes workflow YAML, local actions, planner contracts,
-runner selection, or other CI plumbing, apply the `ci:canary` label to request
-the optional non-required diagnostic. It builds the pull-request merge commit
-through one real hosted Linux amd64 CPU chain (UI artifact, release host,
-native runtime including its runtime-event gate, and product composition).
-The PR head SHA is retained as separate identity evidence. The canary does not
-cover the five required lane orchestrators, macOS, Windows, GPU, SDK, smoke,
-or release paths. The canary lane and runner-policy actions come from protected
-`main`; the merge commit is used only as the product source. Remove the label to
-cancel an active run.
-
-Linux CI uses prebuilt public and self-hosted images from
-[`Mesh-LLM/mesh-llm-runner-images`](https://github.com/Mesh-LLM/mesh-llm-runner-images).
-CPU, Vulkan, versioned CUDA, and versioned ROCm images share a core environment,
-warm dependencies from MeshLLM's checked-in manifests, and allow container
-runtimes to reuse cached layers where the runner host or K3s node retains them
-instead of reinstalling host packages in every job.
-
-If CI is missing a dependency, update the appropriate MeshLLM manifest and
-lockfile or the runner image's YAML profile/installer, then publish the image
-and pin its OCI digest. Do not add a one-off `apt-get`, `pip`, global `npm`,
-`cargo install`, downloaded binary, or similar setup step to an individual
-workflow. Existing workflow-local setup is migration debt, not a pattern for
-new jobs.
-
-### Local validation and extensions
-
-Run the narrow checks that match the change, plus the full contract suite for
-workflow changes:
+Every job runs a command you can run yourself:
 
 ```bash
-just ci-validate
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+ci/simple/test-crates.sh 0 1    # every crate's tests
+just build                      # then ci/simple/smoke.sh <binary> <model> <device>
 ```
 
-The canonical complete local gate is `just test-all`; it includes repository
-consistency, Rust formatting, Clippy, Rust tests, UI/docs builds, and E2E smoke.
-Use `just ci-shellcheck <changed-script>...` for changed shell scripts and
-`just check-release` when release-target consistency is in scope. These are the
-complete CI-definition and worktree checks; narrow checks do not replace
-`just test-all` when full repository validation is required.
-
-Planner fixtures and the CI repository-consistency recipes are included in
-`just ci-validate`. Use `just ci-crate-lists`, `just check-release`, or
-`just publish-crates` when iterating on the corresponding narrower contract.
-
-To add coverage, extend one typed reusable slice or local action, update the
-ownership/dependency/row catalog and planner fixtures, preserve immutable
-producer-to-consumer reachability, and add the slice to its lane's stable
-summary. Keep the controller's bounded projection and aggregate check contract
-in sync. Never copy a PR job into an entrypoint or accept a raw runner label.
-Validate the GitHub fallback before any provider rollout.
+To add coverage, add a step that calls a `just` recipe or a script in
+`ci/simple/`, and describe it in `ci/ci.md`. If a job needs a system package,
+install it in that job.
 
 ## GPU benchmark execution
 

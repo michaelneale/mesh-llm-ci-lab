@@ -1,42 +1,15 @@
 # Test model artifacts
 
-`registry.json` is the canonical source for shared model fixtures used by the
-family battery, ordinary CI, and the parity/radix/competitive suites migrated
-to this contract. Every artifact records an immutable
-Hugging Face revision, its exact file set, byte sizes, SHA-256 digests, family
-capabilities, and the suites and cadences allowed to use it.
+Each file in `manifests/` pins the models one consumer downloads: an immutable
+Hugging Face revision, the exact files, their sizes and their SHA-256 digests.
 
-Run the generator after changing the registry:
+| Manifest | Read by |
+| --- | --- |
+| `product-smoke.json` | The build-and-smoke jobs in CI and the release workflow. |
+| `skippy-correctness.json` | The test jobs in CI. |
+| `hf-download-smoke.json` | `skippy-model-hf`'s download test. |
+| `competitive-benchmark.json` | `skippy/docs/COMPETITIVE_BENCHMARK.md`. |
 
-```bash
-cargo xtool models generate
-```
-
-`cargo test -p xtask --test migration_models` runs the generator in check mode.
-It rejects stale suite manifests, invalid revisions, unsafe paths,
-missing integrity metadata, undeclared suites/cadences, and accidental changes
-to the generated llama family battery.
-
-Consumers should read the generated manifest for their suite with
-`cargo xtool models resolve <manifest> --cadence <cadence>`. The resolver
-rejects artifacts outside their declared cadence, emits repository, revision,
-selector, files, URLs, and integrity metadata, and can stream-verify downloaded
-files with `--verify-root`. Single-file consumers additionally pass
-`--require-single-file` so multipart artifacts fail closed. CI caches use the
-artifact digest in their exact key; a cache hit is still verified before use.
-
-Multi-artifact manifests may declare `default_artifact_id` for callers that
-intentionally consume the suite's canonical fixture without selecting an
-artifact explicitly. Explicit `--artifact-id` selection always takes
-precedence; a multi-artifact manifest without a declared default remains an
-error.
-
-Different repositories, revisions, files, or quantizations remain separate
-named artifacts even when they cover the same model family. This preserves
-intentional coverage differences while preventing each workflow or script from
-inventing another floating or partially pinned download identity.
-
-Entries in `unverified_consumers` document in-scope variants that cannot enter
-the registry yet because their checked-in source lacks an immutable revision
-or complete integrity metadata. Unrelated release QA, WAN lab, and latency
-benchmark downloads keep their existing owner-specific contracts.
+`ci/simple/fetch-model.sh <manifest> <artifact-id> <directory>` downloads one
+artifact, checks its digest and prints the path. Edit a manifest by hand when a
+model changes, and take the digests from the Hugging Face file listing.

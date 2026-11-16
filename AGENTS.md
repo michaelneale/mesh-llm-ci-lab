@@ -133,17 +133,9 @@ Run Cargo commands serially. Do not run multiple Cargo commands in parallel: thi
   Then read the failing job's log directly rather than polling the check rollup, which lags and
   keeps stale results from superseded runs.
 
-For new repository automation, follow the Rust ownership rule in
-`.agents/skills/manage-ci/SKILL.md` and spec section 7.5: do not write new
-Python tooling, including temporary, inline, or skill-local helpers. Reuse or
-extend typed `tools/xtask` commands and call them from thin Just recipes;
-`cargo xtool repo-consistency ci-crate-lists` is an existing command from the
-repository root. Do not move generic policy into shell, PowerShell, or
-JavaScript. Existing Python validation and workflow entrypoints below remain
-transitional until Rust or component-owned tests cover their shape and intent.
-Do not commit Python emulation or differential tests that invoke Python; delete
-each legacy implementation with its last caller switch and validate in normal
-CI. Preserve real consumed outputs and failure semantics.
+For new repository automation, do not write Python tooling, including
+temporary, inline, or skill-local helpers. Prefer a `just` recipe or a small
+shell script; `tools/xtask` holds only what the build, CI and release call.
 
 ### Tests in clean build environments
 
@@ -192,17 +184,10 @@ Do not rerun otherwise unchanged validation solely because a commit is about to 
 
 ### CI changes
 
-Before inspecting, running, defining, editing, reviewing, or documenting CI,
-read `.agents/skills/manage-ci/SKILL.md` completely. The `manage-ci` skill is
-the canonical source for workflow, dependency, runner/worker, image, cache,
-artifact, variable, secret, permission, release, deployment, operational, and
-validation rules. Start every `.github/`, CI-script, or runner-integration edit
-there.
-
-Keep `.agents/skills/manage-ci/references/current-inventory.md` synchronized
-with the checked-in CI contract and `ci/ci.md` synchronized with topology. When
-a CI rule changes, update the skill first rather than adding duplicate guidance
-to this file or `.github/AGENTS.md`.
+CI is `.github/workflows/ci.yml` and releases are
+`.github/workflows/binaries.yml`. Read `ci/ci.md` and
+`.agents/skills/manage-ci/SKILL.md` before changing either, and update
+`ci/ci.md` in the same change.
 
 ### Commit standard
 
