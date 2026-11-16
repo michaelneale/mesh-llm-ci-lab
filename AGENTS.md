@@ -19,7 +19,7 @@ Root `Cargo.toml`, `Cargo.lock`, `.cargo/`, `just/`, CI, and cross-workspace too
 
 The canonical repo-local skills live under `.agents/skills/`; the selectable release-validation specialist is defined in `.agents/agents/release-validation.md`.
 
-Generate and check the public Skippy native API documentation through `cargo xtool automation native-generator contracts api-doc` and `cargo xtool automation native-generator contracts api-doc --check`; follow `skippy/AGENTS.md` for the owning native preparation and documentation paths.
+The public Skippy native API reference is `mesh/website/src/docs/pages/skippy-api.md`; follow `skippy/AGENTS.md` when a public header changes.
 
 ## Building
 
@@ -115,16 +115,12 @@ Product crate documentation.
 Run Cargo commands serially. Do not run multiple Cargo commands in parallel: this workspace frequently hits package-cache and artifact-directory lock conflicts.
 
 - For a touched workspace crate, run focused `cargo check -p <crate>` and `cargo test -p <crate> --lib` during iteration.
-- Before a PR, run the full `cargo test -p <crate>` for every crate CI will test: usually the crates you changed plus their workspace dependents. Root build files and llama pin/patch changes escalate to the whole workspace (the command below prints that). Changes with no crate path (workflows, CI config, just recipes) leave the command's list empty — validate them per the minimum-validation table below instead, and run `just test-all` when the change alters which tests or build options CI invokes or changes the `test-all` recipe itself.
-- `cargo xtool repository affected-crates <paths from your diff against the PR base>` prints CI's list in its `affected` field (a bare invocation prints an empty list), and `just test-all` is the broad fallback, though it runs skippy-runtime and skippy-serving lib-only there.
-- `--lib` skips the integration-test binaries and the doc tests, and CI runs both for the crates it executes (`ci-rust-tests-slice.yml`), so a `--lib`-only run can be green while CI is red.
+- Before a PR, run the full `cargo test -p <crate>` for the crates you changed and the workspace crates that depend on them. CI runs `cargo test -p <crate>` for every workspace crate except `skippy-ffi` (`ci/simple/test-crates.sh`), so `just test-all`, which runs the same script, is the broad fallback.
+- `--lib` skips the integration-test binaries and the doc tests, and CI runs both, so a `--lib`-only run can be green while CI is red.
 - `cargo clippy --all-targets` type-checks test code but never executes it, so a green Clippy run
-  is not a test run either. Before pushing, run the full tests for every crate CI will test,
-  including workspace dependents (`just ci-automation-contracts` for `xtask`; on non-Windows hosts
-  that recipe skips the Windows-only tests CI runs, so run affected platform-specific tests on
-  Windows when available), and treat a failure caught locally as cheap, a failure caught by pushed
+  is not a test run either. Treat a failure caught locally as cheap, a failure caught by pushed
   CI as expensive.
-- Exceptions: `xtask` runs its suites through `just ci-automation-contracts`; `skippy-ffi` is skipped by that slice and no CI job runs its own tests, so run `cargo test -p skippy-ffi --lib` yourself if you touched it; and CI additionally runs one feature-gated `claude-code-integration` real-client test for `mesh-llm-host-runtime` inline.
+- No CI job runs `skippy-ffi`'s own tests, so run `cargo test -p skippy-ffi --lib` yourself if you touched it.
 - For broad refactors, fall back to `cargo check --workspace` (serially).
 - Follow the owning product's additional test and compatibility guidance.
 - When CI fails on a PR, first confirm the failing run belongs to the current head commit and
@@ -160,9 +156,9 @@ Run `just hooks-install` once per clone before your first commit; git cannot act
 Choose validation from the changed surface, not merely from the directory that contains the changed file. A non-Rust file under a Rust crate does not require Cargo validation only when it cannot affect Cargo metadata, build scripts, generated Rust, or the shipped binary. Treat Cargo and build configuration changes as Rust-impacting.
 
 - Rust change — format changed Rust files and run `cargo check -p <touched-crate>` plus `cargo clippy -p <touched-crate> --all-targets -- -D warnings`. Follow the owning product's additional validation rules.
-- Python SDK change — use the in-tree component under `mesh/sdk/python`. Its component command is `"$SDK_PYTHON" -I -B mesh/sdk/python/tests/test_client.py`; mock FFI coverage is separate from the four locked ecosystem clients and their preserved required compatibility or embedding-workload cadence. Binding generation uses this repository's Mesh source, the existing UniFFI 0.32.0 generator and an already built native library; staging has no consumer compiler fallback. External Python research changes still use their owning source pin and locked dependencies. Reader constructor fixtures use native `just agentic-trajectory-reader-contracts`. Generic repository policy and CI planning use `just ci-validate`, including `ci-automation-contracts` and the native `ci-legacy-contracts`; do not restore the retired generic Python unittest gate.
+- Python SDK change — use the in-tree component under `mesh/sdk/python`. Its component command is `"$SDK_PYTHON" -I -B mesh/sdk/python/tests/test_client.py`. Binding generation uses this repository's Mesh source, the existing UniFFI 0.32.0 generator and an already built native library. CI does not run the Python SDK tests.
 - UI-only change — follow `mesh/AGENTS.md` and run `just build`.
-- CI workflow, planner fixture, or CI script change — run `just ci-validate` plus any additional checks required by the CI section below.
+- CI workflow or CI script change — run `actionlint` on the workflow and `shellcheck` on the script, and follow the CI section below.
 - Documentation, non-build configuration, or non-CI shell-only change — run the targeted formatter, generator check, contract test, or syntax check for the changed surface, plus tests that consume the changed surface when such tests exist.
 - Mixed change — run the union of the checks required for each changed surface.
 

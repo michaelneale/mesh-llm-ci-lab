@@ -141,18 +141,10 @@ implementation file.
   `include/skippy/*.h` as the source of truth for the public native API
   reference. Document every public header and exported `skippy_*` function
   beside its declaration with an `@brief` describing the capability it owns.
-- After changing a public Skippy header or exported function, prepare the
-  patched native checkout and regenerate the website page:
-
-  ```bash
-  scripts/prepare-llama.sh pinned
-  cargo xtool automation native-generator contracts api-doc
-  cargo xtool automation native-generator contracts api-doc --check
-  ```
-
-- Commit the regenerated `mesh/website/src/docs/pages/skippy-api.md` with the
-  native queue change. Do not hand-edit the generated page or let a native API
-  PR merge without updating the website reference.
+- After changing a public Skippy header or exported function, update
+  `mesh/website/src/docs/pages/skippy-api.md` by hand in the same change. The
+  tool that generated the page was removed with the rest of the unused
+  automation.
 
 ## Workspace Crates
 

@@ -402,13 +402,10 @@ For stale instances (crashed mesh-llm leaving behind a runtime dir):
 
 See `RELEASE.md` for the full process.
 
-Prepare the canonical version update through a PR when `main` requires
-pull requests and checks. After it merges, run `just release v0.X.Y` from
-clean, current `main` to dispatch the **Release** workflow. The workflow
-reapplies the version update, builds and verifies the full artifact matrix,
-prepares the generated Swift and SDK console resources, and publishes the
-immutable GitHub release. It is dispatch-only; manually pushing a tag does not
-start a release. Follow `RELEASE.md` for candidate, final, and canary behavior.
+Run `just release v0.X.Y` from clean, current `main`. It starts the **Release
+binaries** workflow, which sets the version, builds and tests every archive,
+commits the version to `main`, tags it and publishes the GitHub release.
+`just release v0.X.Y --canary` builds and tests without publishing.
 
 ### Installer checksum sidecars
 
