@@ -258,7 +258,11 @@ jobs:
       - name: Create the release with every archive attached
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+        run: |
+          # A version with a suffix, such as v1.2.3-rc.1, is a prerelease.
+          prerelease=()
+          [[ "$VERSION" != *-* ]] || prerelease=(--prerelease --latest=false)
+          gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}"
       # Mesh-LLM/mesh-packaging builds the packages, container images and npm
       # release from a published stable release. Skipped without its token.
       - name: Tell mesh-packaging about a stable release
