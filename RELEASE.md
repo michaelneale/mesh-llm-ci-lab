@@ -1,63 +1,48 @@
 # Releasing mesh-llm
 
-## Prepare protected main, then dispatch
+## Release from main
 
-When `main` requires pull requests and successful checks, prepare the release
-version in a PR before dispatching the **Release** workflow
-(`.github/workflows/binaries.yml`). `scripts/release-version.sh` is the single
-version authority. From a release-preparation branch, run:
+The **Release binaries** workflow (`.github/workflows/binaries.yml`) is the
+only release publisher. From a clean, up to date local `main`:
 
 ```bash
-scripts/release-version.sh v0.79.0-rc1
-cargo fmt --all --check
-just check-release
-just ci-validate
+just release 0.81.0
 ```
 
-Review the complete generated version diff, run the additional checks required
-by the changed files, and merge the PR after its required checks pass. Then
-update a clean local `main` and dispatch the release:
+The recipe checks the local state, starts the workflow for `v0.81.0` and
+watches it. The workflow:
 
-```bash
-git pull --ff-only
-just release 0.79.0-rc1
-```
+1. sets the version in the source with `scripts/release-version.sh`, the single
+   version authority;
+2. builds the MeshLLM archive, the native runtime archive and the Skippy CLI
+   archive on each platform;
+3. unpacks each CPU, Metal and Vulkan archive and completes a chat request
+   with it. GitHub's runners have no NVIDIA or AMD card, so the CUDA and ROCm
+   archives are built and packaged but not started;
+4. commits the version change as `v0.81.0: prepare release source`, tags it,
+   and pushes the tag and `main`;
+5. publishes the GitHub release with every archive, `native-runtimes.json` and
+   GitHub-generated release notes;
+6. for a stable version, tells `Mesh-LLM/mesh-packaging` to publish packages,
+   container images and the npm release.
 
-Use the same preparation process for the final version, such as `0.79.0`.
-The workflow reapplies the version script before building. With the complete
-version update already on `main`, this is idempotent and its main push is
-up to date. An unprepared version makes the workflow attempt a new version
-commit, which protected branch rules can reject with `GH013`. Prepare and
-merge the version PR instead of bypassing those rules.
+Nothing is committed, tagged or published unless every archive was built and
+tested.
 
-The GitHub Actions UI can dispatch the same workflow from `main` with the
-prepared version input. The workflow builds and verifies the platform bundles,
-then prepares the SwiftPM manifest and SDK console assets. It creates and
-pushes the release tag, publishes the GitHub release, and asks GitHub to generate
-the release notes against the highest stable SemVer tag below the target. RC tags
-are never selected as the comparison base, so every RC includes all changes
-since the previous stable release, and the final release repeats that complete
-range plus any post-RC changes. The `just release <version>` recipe performs
-local preflight and dispatches this same workflow; it does not maintain a second
-version-bump path.
-Canary dispatches build the requested version without changing `main` or
-publishing. After a complete
-stable, non-canary release with the full GPU matrix succeeds, it dispatches
-`Mesh-LLM/mesh-packaging` to package the verified release archives, publish the
-native package release assets, publish the supported GHCR image matrix, and
-assemble and publish the Node SDK to npm. Prereleases publish their immutable
-GitHub Release inputs without invoking downstream publication. Dispatch inputs
-include `skip_gpu_bundles` and `canary` (dry-run: build and smoke everything
-without publishing). Releases that intentionally skip GPU bundles do not
-dispatch the full packaging matrix.
+`just release 0.81.0 --canary` builds and tests every archive and stops there.
+The Actions UI can start the same workflow: `version` is the tag, and `publish`
+off is the canary.
 
-Do not use GitHub's bare **Draft a new release** form as an alternate release
-path. It bypasses the verified artifact graph. The Release workflow is the only
-supported GitHub release publisher; use the Actions UI or `just release` to
-dispatch it from `main`.
+When `main` rejects direct pushes, prepare the version in a pull request first:
+run `scripts/release-version.sh v0.81.0` on a branch, merge it, then run
+`just release 0.81.0`. The workflow's own version change is then empty.
+Pushing a `v*` tag whose source already carries the version also runs the
+release.
 
-The sections below document the underlying steps, workflow debugging, and local
-bundle validation.
+Do not use GitHub's bare **Draft a new release** form. It publishes a release
+with no archives.
+
+The sections below document the underlying steps and local bundle validation.
 
 ## Prerequisites
 
