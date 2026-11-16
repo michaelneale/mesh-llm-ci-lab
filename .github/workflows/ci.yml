@@ -69,8 +69,16 @@ jobs:
         with:
           tool: cargo-machete@0.9.2
       - run: cargo machete
-      - uses: ./.github/actions/install-actionlint
-      - run: actionlint -config-file .github/actionlint.yaml
+      - name: Check the workflows with actionlint
+        env:
+          ARCHIVE: actionlint_1.7.12_linux_amd64.tar.gz
+          SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/$ARCHIVE" \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$ARCHIVE"
+          echo "$SHA256  $RUNNER_TEMP/$ARCHIVE" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$ARCHIVE" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -config-file .github/actionlint.yaml
       - name: Check the pull request title follows Conventional Commits
         if: github.event_name == 'pull_request'
         env:
@@ -160,8 +168,15 @@ jobs:
       matrix:
         include:
           - { name: Linux CPU, runner: ubuntu-24.04, backend: cpu, device: CPU, binary: target/debug/mesh-llm }
+          # GitHub's Linux runners have no GPU; Mesa's software Vulkan driver
+          # (lavapipe) stands in, so the Vulkan backend really loads and runs.
+          - { name: Linux Vulkan, runner: ubuntu-24.04, backend: vulkan, device: Vulkan0, binary: target/debug/mesh-llm,
+              packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: macOS Metal, runner: macos-15, backend: metal, device: MTL0, binary: target/debug/mesh-llm }
-          - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe }
+          # Windows caps a command line at 32,767 characters and rustc is
+          # passed one path per dependency, so the build runs from C:\w.
+          - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe,
+              workdir: 'C:\w' }
     defaults:
       run:
         shell: bash
@@ -173,7 +188,13 @@ jobs:
         with:
           cache: build-${{ matrix.backend }}
           node: "true"
+          packages: ${{ matrix.packages }}
+      - name: Link the checkout at a short path
+        if: matrix.workdir
+        shell: cmd
+        run: mklink /J "${{ matrix.workdir }}" "%GITHUB_WORKSPACE%"
       - name: Build Skippy, the native runtime, MeshLLM and the console
+        working-directory: ${{ matrix.workdir || github.workspace }}
         run: just build backend=${{ matrix.backend }}
       - name: Restore the smoke model
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -182,6 +203,7 @@ jobs:
           key: smoke-model-${{ hashFiles('ci/model-artifacts/manifests/product-smoke.json') }}
           enableCrossOsArchive: true
       - name: Serve a model and complete a chat request
+        working-directory: ${{ matrix.workdir || github.workspace }}
         run: |
           model="$(ci/simple/fetch-model.sh ci/model-artifacts/manifests/product-smoke.json smollm2-q8-inference "$RUNNER_TEMP/models")"
           ci/simple/smoke.sh "${{ matrix.binary }}" "$model" "${{ matrix.device }}"
