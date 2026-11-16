@@ -145,6 +145,18 @@ jobs:
         if: matrix.windows_rocm
         shell: pwsh
         run: .\scripts\install-windows-sdk.ps1 -Backend rocm -RocmHipSdkFilename "${{ matrix.windows_rocm }}"
+      # Packaging signs mesh-llm when the keys are configured, and checks the
+      # signature. Without them the binary is published unsigned.
+      - name: Prepare the release signing keys
+        env:
+          SIGNING_KEY: ${{ secrets.MESH_RELEASE_ATTESTATION_SIGNING_KEY_FILE }}
+          PUBLIC_KEY: ${{ secrets.MESH_RELEASE_ATTESTATION_PUBLIC_KEY_FILE }}
+        run: |
+          [[ -n "$SIGNING_KEY" && -n "$PUBLIC_KEY" ]] || { echo "No signing keys are configured."; exit 0; }
+          printf '%s' "$SIGNING_KEY" > "$RUNNER_TEMP/release-signing-key.json"
+          printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/release-public-key.json"
+          echo "MESH_RELEASE_ATTESTATION_SIGNING_KEY_FILE=$RUNNER_TEMP/release-signing-key.json" >> "$GITHUB_ENV"
+          echo "MESH_RELEASE_ATTESTATION_PUBLIC_KEY_FILE=$RUNNER_TEMP/release-public-key.json" >> "$GITHUB_ENV"
       - name: Build the release binaries
         env:
           # Empty lets the recipe choose from the installed toolkit.
