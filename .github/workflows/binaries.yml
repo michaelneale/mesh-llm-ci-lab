@@ -99,7 +99,9 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends "cuda-toolkit-$CUDA"
           echo /usr/local/cuda/bin >> "$GITHUB_PATH"
-          # Packaging names the archive after the toolkit's major version.
+          # Packaging names the archive after the toolkit's major version, so
+          # the CUDA 12 and CUDA 13 archives of a platform get different names.
+          echo "MESH_CUDA_VERSION=${CUDA/-/.}" >> "$GITHUB_ENV"
           echo "MESH_LLM_CUDA_TOOLKIT_MAJOR=${CUDA%%-*}" >> "$GITHUB_ENV"
           df -h /
       - name: Install AMD's ROCm toolkit
@@ -261,11 +263,19 @@ jobs:
       - uses: ./.github/actions/setup-build
         with:
           cache: release-publish
+      # Each platform's files land in a directory of their own, so that two
+      # platforms naming an archive alike fail the release, not overwrite it.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-*
-          path: dist
-          merge-multiple: true
+          path: artifacts
+      - name: Gather the archives of every platform
+        run: |
+          shared="$(find artifacts -type f -exec basename {} \; | sort | uniq -d)"
+          [[ -z "$shared" ]] || { echo "::error::Built by more than one platform: $shared"; exit 1; }
+          mkdir -p dist
+          find artifacts -type f -exec mv {} dist/ \;
+          ls -l dist
       - name: List the native runtime archives in native-runtimes.json
         run: |
           scripts/generate-native-runtime-release-manifest.sh --tag "$VERSION" --repo "$GITHUB_REPOSITORY" \
