@@ -530,19 +530,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "authority-automation"
-version = "0.80.0"
-dependencies = [
- "ci-controller",
- "hex",
- "libc",
- "serde_json",
- "sha2 0.11.0",
- "tempfile",
- "url",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,17 +1193,6 @@ dependencies = [
  "serde",
  "wasm-bindgen",
  "windows-link",
-]
-
-[[package]]
-name = "ci-controller"
-version = "0.80.0"
-dependencies = [
- "hex",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "tempfile",
 ]
 
 [[package]]
@@ -6974,17 +6950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "process-supervision"
-version = "0.80.0"
-dependencies = [
- "libc",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "process-wrap"
 version = "10.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11626,8 +11591,6 @@ dependencies = [
 name = "xtask"
 version = "0.80.0"
 dependencies = [
- "authority-automation",
- "ci-controller",
  "ed25519-dalek",
  "flate2",
  "getrandom 0.3.4",
@@ -11635,7 +11598,6 @@ dependencies = [
  "libc",
  "mesh-llm-release-footer",
  "proc-macro2",
- "process-supervision",
  "serde",
  "serde_json",
  "sha2 0.11.0",

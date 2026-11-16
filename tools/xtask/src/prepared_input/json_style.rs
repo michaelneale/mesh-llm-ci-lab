@@ -1,7 +1,7 @@
 //! Stable order-preserving registry bytes consumed by generated-file checks.
 //! Layout, ASCII escaping, and decimal spelling are output contracts.
 
-use ci_controller::plan::document::Json;
+use crate::ci_plan::document::Json;
 use serde_json::Number;
 use std::fmt::Write;
 
@@ -13,14 +13,6 @@ pub struct Style {
     pub key_separator: &'static str,
     pub ensure_ascii: bool,
 }
-
-/// Two-space indentation with literal Unicode.
-pub const PRETTY: Style = Style {
-    indent: Some(2),
-    item_separator: ",",
-    key_separator: ": ",
-    ensure_ascii: false,
-};
 
 /// Single-line JSON with spaced separators and literal Unicode.
 pub const INLINE: Style = Style {
@@ -34,13 +26,6 @@ pub const INLINE: Style = Style {
 pub const ASCII: Style = Style {
     ensure_ascii: true,
     ..INLINE
-};
-
-/// Compact ASCII-escaped step-output JSON.
-pub const ASCII_COMPACT: Style = Style {
-    item_separator: ",",
-    key_separator: ":",
-    ..ASCII
 };
 
 pub fn dumps(value: &Json, style: Style) -> String {
@@ -184,22 +169,8 @@ mod tests {
     }
 
     #[test]
-    fn registry_bytes_preserve_indentation() {
-        let value = parse(r#"{"a":[1,{"b":[]}],"c":{},"d":"é\u2028\u007f","e":2.0}"#);
-        assert_eq!(
-            dumps(&value, PRETTY),
-            "{\n  \"a\": [\n    1,\n    {\n      \"b\": []\n    }\n  ],\n  \"c\": {},\n  \"d\": \"é\u{2028}\u{7f}\",\n  \"e\": 2.0\n}"
-        );
-    }
-
-    #[test]
     fn step_output_bytes_preserve_escaping() {
         let value = parse(r#"{"k":["é","\u007f\u0001"]}"#);
         assert_eq!(dumps(&value, ASCII), r#"{"k": ["\u00e9", "\u007f\u0001"]}"#);
-        assert_eq!(
-            dumps(&value, ASCII_COMPACT),
-            r#"{"k":["\u00e9","\u007f\u0001"]}"#
-        );
-        assert_eq!(dumps(&value, INLINE), "{\"k\": [\"é\", \"\u{7f}\\u0001\"]}");
     }
 }

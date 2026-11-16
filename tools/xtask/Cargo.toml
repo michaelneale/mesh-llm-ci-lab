@@ -5,9 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-authority-automation = { path = "../authority-automation" }
-ci-controller = { path = "../ci-controller" }
-process-supervision = { path = "../process-supervision" }
 ed25519-dalek = { version = "=3.0.0", features = ["rand_core"] }
 flate2 = "1"
 getrandom = "0.3"
@@ -19,7 +16,6 @@ serde_json = { version = "1", features = ["float_roundtrip", "raw_value"] }
 sha2 = "0.11"
 syn = { version = "2", features = ["full", "visit"] }
 thiserror = "2"
-tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -28,3 +24,4 @@ libc = "0.2"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_Diagnostics_ToolHelp", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_Threading"] }
 
 [dev-dependencies]
+tempfile = "3"

@@ -31,9 +31,13 @@ runs:
       # Removing these takes over a minute, so it runs behind the build.
       run: sudo nohup rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL >/dev/null 2>&1 &
 
-    - name: Use short Windows build paths
+    # Keep the compiler cache and temporary files under short Windows paths.
+    - name: Use short Windows paths
       if: runner.os == 'Windows'
-      uses: ./.github/actions/setup-windows-short-paths
+      shell: bash
+      run: |
+        mkdir -p /c/s /c/t
+        printf '%s\n' 'SCCACHE_DIR=C:\s' 'TEMP=C:\t' 'TMP=C:\t' >> "$GITHUB_ENV"
 
     # One pinned compiler everywhere, so a new Rust release cannot turn CI red
     # on its own. Bump it in a pull request.

@@ -5,7 +5,7 @@
 mod subject;
 mod trailers;
 
-use crate::DynResult;
+use crate::command::DynResult;
 use crate::repository::check_args::{Grammar, ParsedArgs};
 use crate::repository::check_report::CheckReport;
 use crate::repository::text::{splitlines, strip};

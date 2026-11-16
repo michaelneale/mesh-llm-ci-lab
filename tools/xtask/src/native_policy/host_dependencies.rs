@@ -12,8 +12,8 @@ use super::imports::{elf_imports, macho_imports, pe_imports};
 use super::toolchain::{Toolchain, run_tool};
 use crate::ci_plan::catalog::{os_error_text, python_path_display};
 use crate::ci_plan::document::Json;
+use crate::prepared_input::json_style::{ASCII, Style, dumps};
 use crate::repository::check_report::CheckReport;
-use authority_automation::model_registry::json_bytes::{ASCII, Style, dumps};
 use std::path::{Path, PathBuf};
 
 #[path = "host_dependencies/binary_identity.rs"]

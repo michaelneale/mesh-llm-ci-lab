@@ -1,2 +1,4 @@
-//! JSON document and path helpers shared with the CI controller crate.
-pub(crate) use ci_controller::plan::{catalog, document, plan_bytes};
+//! JSON document and path helpers shared by the packaging commands.
+pub(crate) mod catalog;
+pub(crate) mod document;
+pub(crate) mod plan_bytes;

@@ -1,52 +1,28 @@
 //! Read the immutable producer's build contract before composing product bytes.
 use super::json_object::{display, item};
 use crate::ci_plan::document::Json;
-use crate::process::{
-    self, Cancellation, Completion, Limits, ProcessSpec, RawCaptureOptions, Readiness, Value,
-};
-use std::num::NonZeroUsize;
 use std::path::Path;
-use std::time::Duration;
+use std::process::{Command, Stdio};
 
 pub(super) fn read(host: &Path) -> Result<Json, String> {
-    let spec = ProcessSpec {
-        executable: host.canonicalize().map_err(|error| error.to_string())?,
-        arguments: ["--log-format", "json", "--print-build-contract"]
-            .into_iter()
-            .map(|value| Value::Public(value.into()))
-            .collect(),
-        cwd: std::env::current_dir().map_err(|error| error.to_string())?,
-        environment: ["PATH", "SYSTEMROOT", "WINDIR"]
-            .into_iter()
-            .filter_map(|key| std::env::var_os(key).map(|value| (key.into(), Value::Public(value))))
-            .collect(),
-    };
-    let limits = Limits {
-        execution: Duration::from_secs(30),
-        graceful_shutdown: Duration::from_secs(1),
-        forced_shutdown: Duration::from_secs(2),
-        retained_bytes_per_stream: 65536,
-        readiness: Readiness::None,
-        completion: Completion::Exit,
-    };
-    let report = process::supervise_raw(
-        &spec,
-        &limits,
-        &Cancellation::default(),
-        RawCaptureOptions {
-            stdout: NonZeroUsize::new(65536),
-            stderr: NonZeroUsize::new(65536),
-        },
-    )
-    .map_err(|error| format!("host build contract probe failed: {error:?}"))?;
-    if !report.process.success() {
+    let output = Command::new(host.canonicalize().map_err(|error| error.to_string())?)
+        .args(["--log-format", "json", "--print-build-contract"])
+        .env_clear()
+        .envs(
+            ["PATH", "SYSTEMROOT", "WINDIR"]
+                .into_iter()
+                .filter_map(|key| std::env::var_os(key).map(|value| (key, value))),
+        )
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| format!("host build contract probe failed: {error}"))?;
+    if !output.status.success() {
         return Err(format!(
-            "host build contract probe failed: {:?}",
-            report.process
+            "host build contract probe failed: {}",
+            output.status
         ));
     }
-    let bytes = report.stdout.ok_or("host build contract output missing")?;
-    let contract = Json::parse(bytes.as_bytes()).map_err(|error| error.to_string())?;
+    let contract = Json::parse(&output.stdout).map_err(|error| error.to_string())?;
     check(&contract)?;
     Ok(contract)
 }

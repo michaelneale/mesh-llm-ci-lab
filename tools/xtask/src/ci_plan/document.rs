@@ -32,11 +32,6 @@ impl Json {
             .map(|(_, value)| value)
     }
 
-    /// Python `dict.get` that also maps JSON `null` to `None`.
-    pub fn get_present(&self, key: &str) -> Option<&Json> {
-        self.get(key).filter(|value| **value != Json::Null)
-    }
-
     pub fn as_object(&self) -> Option<&[(String, Json)]> {
         match self {
             Json::Object(entries) => Some(entries),
@@ -68,10 +63,6 @@ impl Json {
                 .or_else(|| number.as_u64().map(i128::from)),
             _ => None,
         }
-    }
-
-    pub fn equals_one(&self) -> bool {
-        self.as_int() == Some(1)
     }
 
     pub fn to_value(&self) -> Value {
@@ -176,9 +167,6 @@ mod tests {
     #[test]
     fn schema_version_requires_integer_identity() {
         let one = |text: &str| Json::parse(text.as_bytes()).expect("valid JSON");
-        assert!(one("1").equals_one());
-        assert!(!one("1.0").equals_one() && !one("true").equals_one());
-        assert!(!one("2").equals_one() && !one("\"1\"").equals_one());
         assert_eq!(one("1.0").as_int(), None);
         assert_eq!(one("true").as_int(), None);
         assert_eq!(one("7").as_int(), Some(7));

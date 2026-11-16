@@ -7,10 +7,9 @@ set -euo pipefail
 
 index="$1" count="$2"
 
-# skippy-ffi has no tests CI runs. ci-controller is the planner behind the
-# previous CI; its suite asserts workflows this CI replaced.
+# skippy-ffi has no tests CI runs.
 mapfile -t crates < <(cargo metadata --locked --no-deps --format-version 1 \
-    | jq -r '.packages[].name' | grep -Evx 'skippy-ffi|ci-controller' | sort \
+    | jq -r '.packages[].name' | grep -vx skippy-ffi | sort \
     | awk -v i="$index" -v n="$count" 'NR % n == i')
 
 failed=()

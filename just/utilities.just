@@ -76,4 +76,4 @@ hooks-install:
 # Validate commit subjects in a range against Conventional Commits v1.0.0.
 [unix]
 check-commits range="origin/main..HEAD":
-    just with-lld cargo run --locked -q -p ci-controller -- repository conventional-commits --range "{{ range }}"
+    just with-lld cargo xtool repository conventional-commits --range "{{ range }}"

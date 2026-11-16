@@ -3,14 +3,11 @@
 
 mod artifact;
 mod attestation;
-mod automation;
 mod ci_operations;
 mod ci_plan;
 mod cli;
 mod cli_output;
 mod command;
-#[allow(dead_code)]
-mod command_interrupt;
 mod native_policy;
 mod no_console_print;
 mod prepared_input;
@@ -19,8 +16,6 @@ mod repo_consistency;
 mod repository;
 
 use command::DynResult;
-// Transitional: call sites still import supervision as `crate::process`.
-use process_supervision as process;
 
 #[cfg(test)]
 mod tests;
@@ -54,11 +49,17 @@ fn run() -> DynResult<()> {
         Ok(root)
     };
     match parsed.command {
-        cli::CliCommand::UiBuild(rest) => automation::ui_build::run(rest),
         cli::CliCommand::Artifact(command, rest) => artifact::run(command, rest),
         cli::CliCommand::Native(command, rest) => native_policy::run(command, rest, resolve_root),
         cli::CliCommand::Product(command, rest) => product::run(command, rest),
         cli::CliCommand::CargoTargetDirectory(rest) => repository::cargo_target_directory(rest),
+        cli::CliCommand::ConventionalCommits(rest) => {
+            let cwd = match &explicit_root {
+                Some(root) => root.as_path().to_path_buf(),
+                None => std::env::current_dir()?,
+            };
+            repository::conventional_commit::run(&cwd, rest)
+        }
         cli::CliCommand::NoConsolePrint(rest) => {
             no_console_print::check_no_console_print_command(&resolve_root()?, rest)
         }

@@ -83,7 +83,7 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: cargo run --locked -q -p ci-controller -- repository conventional-commits --message "$PR_TITLE"
+        run: cargo run --locked -q -p xtask -- repository conventional-commits --message "$PR_TITLE"
 
   clippy:
     name: Clippy
