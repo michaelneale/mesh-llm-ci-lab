@@ -45,6 +45,10 @@ runs:
     - uses: taiki-e/install-action@3d23c1bbdafe696dfccad2664945a04f47d03dc3 # just
 
     - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      # sccache 0.17 and later expand Cargo's rustc argument file, which passes
+      # the Windows command-line limit (mozilla/sccache#2787).
+      with:
+        version: ${{ runner.os == 'Windows' && 'v0.16.0' || '' }}
 
     # sccache keeps its cache in one directory, saved and restored as a single
     # Actions cache entry. Its per-object Actions backend is rate limited.

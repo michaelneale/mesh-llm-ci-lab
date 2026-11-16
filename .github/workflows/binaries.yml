@@ -35,7 +35,7 @@ jobs:
           - { name: Linux arm64, runner: ubuntu-24.04-arm, recipe: release-build-aarch64, device: CPU }
           - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: Vulkan0,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
-          - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU, workdir: 'C:\w' }
+          - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU }
     defaults:
       run:
         shell: bash
@@ -48,15 +48,9 @@ jobs:
           cache: ${{ matrix.recipe }}-${{ matrix.flavor || 'default' }}
           node: "true"
           packages: ${{ matrix.packages }}
-      - name: Link the checkout at a short path
-        if: matrix.workdir
-        shell: cmd
-        run: mklink /J "${{ matrix.workdir }}" "%GITHUB_WORKSPACE%"
       - name: Build the release binaries
-        working-directory: ${{ matrix.workdir || github.workspace }}
         run: just ${{ matrix.recipe }}
       - name: Package the release archive
-        working-directory: ${{ matrix.workdir || github.workspace }}
         run: just release-bundle "$VERSION" dist "${{ matrix.flavor }}"
       - name: Restore the smoke model
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -65,7 +59,6 @@ jobs:
           key: smoke-model-${{ hashFiles('ci/model-artifacts/manifests/product-smoke.json') }}
           enableCrossOsArchive: true
       - name: Unpack the archive and complete a chat request with it
-        working-directory: ${{ matrix.workdir || github.workspace }}
         run: |
           archive="$(find dist -maxdepth 1 -type f -name "mesh-llm-$VERSION-*" ! -name '*.sha256')"
           mkdir -p "$RUNNER_TEMP/product"

@@ -177,10 +177,7 @@ jobs:
           - { name: Linux Vulkan, runner: ubuntu-24.04, backend: vulkan, device: Vulkan0, binary: target/debug/mesh-llm,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: macOS Metal, runner: macos-15, backend: metal, device: MTL0, binary: target/debug/mesh-llm }
-          # Windows caps a command line at 32,767 characters and rustc is
-          # passed one path per dependency, so the build runs from C:\w.
-          - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe,
-              workdir: 'C:\w' }
+          - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe }
     defaults:
       run:
         shell: bash
@@ -193,12 +190,7 @@ jobs:
           cache: build-${{ matrix.backend }}
           node: "true"
           packages: ${{ matrix.packages }}
-      - name: Link the checkout at a short path
-        if: matrix.workdir
-        shell: cmd
-        run: mklink /J "${{ matrix.workdir }}" "%GITHUB_WORKSPACE%"
       - name: Build Skippy, the native runtime, MeshLLM and the console
-        working-directory: ${{ matrix.workdir || github.workspace }}
         run: just build backend=${{ matrix.backend }}
       - name: Restore the smoke model
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -207,7 +199,6 @@ jobs:
           key: smoke-model-${{ hashFiles('ci/model-artifacts/manifests/product-smoke.json') }}
           enableCrossOsArchive: true
       - name: Serve a model and complete a chat request
-        working-directory: ${{ matrix.workdir || github.workspace }}
         run: |
           model="$(ci/simple/fetch-model.sh ci/model-artifacts/manifests/product-smoke.json smollm2-q8-inference "$RUNNER_TEMP/models")"
           ci/simple/smoke.sh "${{ matrix.binary }}" "$model" "${{ matrix.device }}"

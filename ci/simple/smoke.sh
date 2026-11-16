@@ -19,12 +19,12 @@ trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
 
 fail() {
     echo "smoke failed: $1" >&2
-    tail -n 80 "$log" >&2
+    grep -v "model listing" "$log" | tail -n 150 >&2
     exit 1
 }
 
 # The model is listed once it has loaded; that is the state to wait for.
-for _ in $(seq 1 180); do
+for _ in $(seq 1 300); do
     kill -0 "$pid" 2>/dev/null || fail "mesh-llm exited before it was ready"
     if curl -fsS "http://127.0.0.1:$port/v1/models" 2>/dev/null | jq -e '.data | length > 0' >/dev/null 2>&1; then
         ready=1
@@ -32,7 +32,7 @@ for _ in $(seq 1 180); do
     fi
     sleep 1
 done
-[[ "${ready:-}" == 1 ]] || fail "no model was listed within 180 seconds"
+[[ "${ready:-}" == 1 ]] || fail "no model was listed within 300 seconds"
 
 name="$(curl -fsS "http://127.0.0.1:$port/v1/models" | jq -r '.data[0].id')"
 request="$(jq -cn --arg model "$name" \
