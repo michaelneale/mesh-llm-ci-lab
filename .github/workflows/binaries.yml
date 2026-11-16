@@ -47,10 +47,11 @@ jobs:
           - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: CPU,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU }
-          # GitHub's runners have no NVIDIA card, so the CUDA archives are built
-          # and packaged here but not started.
+          # GitHub's runners have no NVIDIA or AMD card, so the CUDA and ROCm
+          # archives are built and packaged here but not started.
           - { name: Linux x86_64 CUDA 12, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 12-9 }
           - { name: Linux x86_64 CUDA 13, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 13-1 }
+          - { name: Linux x86_64 ROCm, runner: ubuntu-24.04, recipe: release-build-rocm, flavor: rocm, rocm: "7.0" }
     defaults:
       run:
         shell: bash
@@ -80,6 +81,25 @@ jobs:
           echo /usr/local/cuda/bin >> "$GITHUB_PATH"
           # Packaging names the archive after the toolkit's major version.
           echo "MESH_LLM_CUDA_TOOLKIT_MAJOR=${CUDA%%-*}" >> "$GITHUB_ENV"
+          df -h /
+      - name: Install AMD's ROCm toolkit
+        if: matrix.rocm
+        env:
+          KEY: https://repo.radeon.com/rocm/rocm.gpg.key
+          KEY_SHA256: 2de99e2354646a90d9903e2a669fc4e36b02c1bbff7075c481e12d7edab2c88b
+          ROCM: ${{ matrix.rocm }}
+        run: |
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/rocm.key" "$KEY"
+          echo "$KEY_SHA256  $RUNNER_TEMP/rocm.key" | sha256sum -c -
+          sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg "$RUNNER_TEMP/rocm.key"
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/$ROCM noble main" |
+            sudo tee /etc/apt/sources.list.d/rocm.list
+          printf 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600\n' |
+            sudo tee /etc/apt/preferences.d/rocm-pin-600
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends hip-dev hipblas-dev rocblas-dev rocm-cmake rocm-device-libs
+          echo /opt/rocm/bin >> "$GITHUB_PATH"
+          echo "ROCM_PATH=/opt/rocm" >> "$GITHUB_ENV"
           df -h /
       - name: Build the release binaries
         run: just ${{ matrix.recipe }}
