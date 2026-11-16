@@ -1127,6 +1127,9 @@ Invoke-InRepo {
         "-DGGML_BMI2=OFF",
         "-DBUILD_SHARED_LIBS=ON",
         "-DLLAMA_CURL=OFF",
+        # As on Linux and macOS. Left on, llama.cpp links whichever OpenSSL the
+        # build machine has and the archive then ships that machine's copy.
+        "-DLLAMA_OPENSSL=OFF",
         "-DLLAMA_BUILD_EXAMPLES=OFF",
         "-DLLAMA_BUILD_TESTS=OFF",
         "-DGGML_BUILD_TESTS=OFF",
