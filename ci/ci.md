@@ -60,4 +60,7 @@ The CUDA and ROCm archives are compiled and packaged but never started: GitHub's
 runners have no NVIDIA or AMD card. A cold CUDA or ROCm build of llama.cpp takes
 two to three hours. Nothing is published unless every platform succeeds.
 
-Without the release signing keys the binaries are published unstamped.
+Packaging signs `mesh-llm` and checks the signature when the
+`MESH_RELEASE_ATTESTATION_SIGNING_KEY_FILE` and
+`MESH_RELEASE_ATTESTATION_PUBLIC_KEY_FILE` secrets are set. Without them the
+binary is published unsigned.
