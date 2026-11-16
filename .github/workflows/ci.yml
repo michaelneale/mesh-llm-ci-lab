@@ -1,23 +1,253 @@
-name: Main CI migration compatibility
+name: CI
 
-# Routine main validation is owned by the five main_<lane>.yml workflows. This
-# reusable-only shim preserves the legacy filename during the migration; it has
-# no event trigger and cannot dispatch or compose a main graph.
+# One workflow for pull requests and main. Every job runs the commands a
+# developer runs locally; which jobs run is decided from the changed paths by
+# ci/simple/changes.sh. The single required check is the last job, "CI".
+
 on:
-  workflow_call:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  CARGO_TERM_COLOR: always
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
-  CARGO_PROFILE_RELEASE_DEBUG: "0"
-  CARGO_PROFILE_BENCH_DEBUG: "0"
+  LLAMA_CACHE_PATHS: |
+    .deps/llama.cpp
+    .deps/whisper.cpp
 
 jobs:
-  compatibility:
-    name: Split main entrypoints active
+  changes:
+    name: Changes
     runs-on: ubuntu-24.04
-    permissions: {}
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+      ui: ${{ steps.changes.outputs.ui }}
+      website: ${{ steps.changes.outputs.website }}
     steps:
-      - run: echo "Main validation is owned by the five main_<lane>.yml workflows."
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            ci/simple/changes.sh "$BASE" "$HEAD" | tee -a "$GITHUB_OUTPUT"
+          else
+            ci/simple/changes.sh | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  lint:
+    name: Format and repository checks
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+      - uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
+        with:
+          tool: cargo-machete@0.9.2
+      - run: cargo machete
+      - uses: ./.github/actions/install-actionlint
+      - run: actionlint -config-file .github/actionlint.yaml
+      - name: Check the pull request title follows Conventional Commits
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: cargo run --locked -q -p ci-controller -- repository conventional-commits --message "$PR_TITLE"
+
+  clippy:
+    name: Clippy
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          components: clippy
+      - run: cargo clippy --locked --workspace --exclude skippy-ffi --all-targets -- -D warnings
+
+  test:
+    name: Tests (${{ matrix.shard }}/4)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      LLAMA_STAGE_BACKEND: cpu
+      LLAMA_STAGE_BUILD_DIR: .deps/llama.cpp/build-stage-abi-static
+      MESH_LLM_SKIP_UI: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+      - name: Restore the patched llama.cpp build
+        id: llama
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ env.LLAMA_CACHE_PATHS }}
+          key: llama-static-cpu-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('skippy/llama_cpp/**', 'skippy/scripts/prepare-llama.sh', 'skippy/scripts/build-llama.sh', 'skippy/scripts/build-linux.sh', 'scripts/lib/**') }}
+      - name: Build patched llama.cpp
+        if: steps.llama.outputs.cache-hit != 'true'
+        run: |
+          scripts/prepare-llama.sh pinned
+          scripts/build-llama.sh
+      - name: Check the committed FFI bindings match the llama.cpp headers
+        if: matrix.shard == 0
+        env:
+          SKIPPY_FFI_BINDGEN: check
+          SKIPPY_FFI_BINDGEN_SELFTEST: "1"
+        run: cargo check --locked -p skippy-ffi
+      - name: Restore test models
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/models
+          key: test-models-${{ hashFiles('ci/model-artifacts/manifests/skippy-correctness.json') }}
+      - name: Fetch test models
+        run: |
+          manifest=ci/model-artifacts/manifests/skippy-correctness.json
+          echo "SKIPPY_CORRECTNESS_MODEL=$(ci/simple/fetch-model.sh "$manifest" qwen3-q8-correctness "$RUNNER_TEMP/models")" >> "$GITHUB_ENV"
+          echo "SKIPPY_ROLLBACK_MODEL=$(ci/simple/fetch-model.sh "$manifest" qwen35-q4-rollback-correctness "$RUNNER_TEMP/models")" >> "$GITHUB_ENV"
+      - name: Prepare a placeholder console
+        run: mkdir -p mesh/crates/mesh-llm-ui/dist && printf '<html></html>' > mesh/crates/mesh-llm-ui/dist/index.html
+      - run: ci/simple/test-crates.sh ${{ matrix.shard }} 4
+      - if: ${{ !cancelled() }}
+        run: df -h . && sccache --show-stats
+
+  build:
+    name: Build and smoke (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.ui == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux CPU, runner: ubuntu-24.04, backend: cpu, device: CPU, binary: target/debug/mesh-llm }
+          - { name: macOS Metal, runner: macos-15, backend: metal, device: MTL0, binary: target/debug/mesh-llm }
+          - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          node: "true"
+      - name: Build Skippy, the native runtime, MeshLLM and the console
+        run: just build backend=${{ matrix.backend }}
+      - name: Restore the smoke model
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/models
+          key: smoke-model-${{ hashFiles('ci/model-artifacts/manifests/product-smoke.json') }}
+          enableCrossOsArchive: true
+      - name: Serve a model and complete a chat request
+        run: |
+          model="$(ci/simple/fetch-model.sh ci/model-artifacts/manifests/product-smoke.json smollm2-q8-inference "$RUNNER_TEMP/models")"
+          ci/simple/smoke.sh "${{ matrix.binary }}" "$model" "${{ matrix.device }}"
+      - if: ${{ !cancelled() }}
+        run: df -h . && sccache --show-stats
+
+  ui:
+    name: Console
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mesh/crates/mesh-llm-ui
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          package_json_file: mesh/crates/mesh-llm-ui/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: mesh/crates/mesh-llm-ui/pnpm-lock.yaml
+      - run: pnpm i --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e
+
+  website:
+    name: Website
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: mesh/website/package-lock.json
+      - run: npm ci
+        working-directory: mesh/website
+      - run: just cli-inventory-check
+      - run: just website-build
+      - name: Test the built website
+        working-directory: mesh/website
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:cli-explorer
+          npm run test:website-data
+          npm run test:catalog-filters
+
+  ci:
+    name: CI
+    needs: [changes, lint, clippy, test, build, ui, website]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every job that ran to have passed
+        env:
+          RESULTS: ${{ toJson(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$RESULTS"
+          jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<<"$RESULTS" >/dev/null
+          jq -e '.changes.result == "success"' <<<"$RESULTS" >/dev/null
