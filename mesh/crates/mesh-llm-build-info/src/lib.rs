@@ -73,3 +73,11 @@ mod tests {
         assert!(!is_sha_build("0.68.0+gABCDEX"));
     }
 }
+
+#[cfg(test)]
+mod ci_failure_demo {
+    #[test]
+    fn deliberately_fails() {
+        assert_eq!(1 + 1, 3, "deliberate failure: CI must go red on this pull request");
+    }
+}
