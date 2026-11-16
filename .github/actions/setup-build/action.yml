@@ -56,8 +56,8 @@ runs:
 
     # sccache keeps its cache in one directory, saved and restored as a single
     # Actions cache entry. Its per-object Actions backend is rate limited.
-    # GitHub keeps 10 GB of caches per repository, so each entry is capped and
-    # debug builds carry line tables only to keep the entries small.
+    # GitHub keeps 10 GB of caches per repository, so debug builds carry line
+    # tables only, and save-build-cache drops what this job did not use.
     - name: Configure the compiler cache
       shell: bash
       env:
@@ -68,7 +68,7 @@ runs:
           echo "SCCACHE_DIR=$HOME/.cache/sccache-ci" >> "$GITHUB_ENV"
         fi
         {
-          echo "SCCACHE_CACHE_SIZE=1500M"
+          echo "SCCACHE_CACHE_SIZE=3G"
           echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only"
           echo "RUSTC_WRAPPER=sccache"
           echo "CARGO_INCREMENTAL=0"
@@ -84,6 +84,12 @@ runs:
         restore-keys: |
           ${{ env.BUILD_CACHE_PREFIX }}${{ hashFiles('Cargo.lock') }}-
           ${{ env.BUILD_CACHE_PREFIX }}
+
+    # sccache touches a cached object when it is used, so anything older than
+    # this marker at the end of the job was not needed.
+    - name: Mark the start of the build
+      shell: bash
+      run: touch "$RUNNER_TEMP/build-cache-marker"
 
     - name: Install Linux linkers and packages
       if: runner.os == 'Linux'

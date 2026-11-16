@@ -1,6 +1,7 @@
 name: Save the compiler cache
 description: >
-  Report compiler cache use, then save the cache that setup-build restored.
+  Report compiler cache use, drop the cached objects this job did not use,
+  then save the cache that setup-build restored.
   Only main saves, so pull requests read a cache they cannot change.
 
 runs:
@@ -12,6 +13,9 @@ runs:
         df -h .
         sccache --show-stats
         sccache --stop-server || true
+        # Keep only what this job used, so the saved cache does not grow.
+        find "$SCCACHE_DIR" -type f ! -newer "$RUNNER_TEMP/build-cache-marker" -delete
+        du -sh "$SCCACHE_DIR"
     - name: Save the compiler cache
       if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
