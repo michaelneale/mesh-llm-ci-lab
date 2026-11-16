@@ -184,6 +184,10 @@ jobs:
           fi
           # The native runtime archive was written by the build.
           find "$runtimes" -maxdepth 1 -type f -name 'meshllm-native-runtime-*.tar.gz*' -exec mv {} dist/ \;
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            # unzip fails on an archive whose entries use backslash separators.
+            for zip in dist/*.zip; do unzip -tq "$zip"; done
+          fi
           ls -l dist
           test -s "$(echo dist/meshllm-native-runtime-*.tar.gz)"
       - name: Restore the smoke model
