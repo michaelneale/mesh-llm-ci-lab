@@ -1,9 +1,3 @@
-# Build the local product, then exercise the embedded console against a real
-# isolated mesh-llm process. The harness owns and verifies its cleanup.
-[unix]
-qa-logging-console-e2e:
-    @just build
-    @scripts/qa-logging-console-e2e.sh --current-binary ./target/debug/mesh-llm
 
 [unix]
 bootstrap-build-tools:

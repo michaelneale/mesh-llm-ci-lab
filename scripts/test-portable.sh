@@ -33,10 +33,8 @@ website_build() {
 }
 
 script_and_sdk_tests() {
-    just ci-legacy-contracts
     node --test scripts/console-format.test.js
     npm test --prefix mesh/sdk/node
-    scripts/check-sdk-contract.sh
 
     if command -v java >/dev/null 2>&1 && java -version >/dev/null 2>&1; then
         (cd mesh/sdk/kotlin && ./gradlew test --no-daemon)

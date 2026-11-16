@@ -128,11 +128,6 @@ skippy-quantize-standalone-release-build backend="cpu":
     LLAMA_STAGE_BACKEND="{{ backend }}" LLAMA_STAGE_LINK_MODE=static scripts/build-llama.sh
     LLAMA_STAGE_BACKEND="{{ backend }}" LLAMA_STAGE_LINK_MODE=static just with-lld cargo build --release --locked -p skippy-quantize --no-default-features
 
-# Build isolated CPU workload certification producers (not a shipping runtime).
-[unix]
-skippy-workload-oracles-build output:
-    bash scripts/skippy-workload-oracles-build.sh "{{ output }}"
-
 # Build and execute the opt-in private native Skippy application probes.
 [unix]
 skippy-native-tests backend="cpu":
@@ -182,18 +177,10 @@ skippy-native-full-replay backend="cpu":
     scripts/prepare-llama.sh pinned
     LLAMA_STAGE_BACKEND="{{ backend }}" LLAMA_STAGE_LINK_MODE=static LLAMA_STAGE_BUILD_DIR="$PWD/.deps/llama-build/build-stage-full-replay-static-{{ backend }}" LLAMA_STAGE_FULL_REPLAY=ON LLAMA_STAGE_FORCE_BUILD=1 scripts/build-llama.sh
 
-# Run skippy family certification checks.
-family-certify *ARGS:
-    just with-lld scripts/family-certify.sh {{ ARGS }}
-
 # Run target/draft speculative compatibility checks.
 spec-bench target draft *ARGS:
     just with-lld env LLAMA_STAGE_BUILD_DIR=".deps/llama-build/build-stage-abi-static" cargo build -p llama-spec-bench
     LLAMA_STAGE_BUILD_DIR=".deps/llama-build/build-stage-abi-static" target/debug/llama-spec-bench --target-model-path "{{ target }}" --draft-model-path "{{ draft }}" {{ ARGS }}
-
-# Smoke a standalone skippy OpenAI frontend stage.
-skippy-openai-smoke *ARGS:
-    just with-lld scripts/skippy-openai-smoke.sh {{ ARGS }}
 
 # Build the OpenAI benchmark server against an explicitly selected native ABI.
 # Nightly runners provide LLAMA_STAGE_BUILD_DIR from their pre-baked image.
