@@ -11,8 +11,9 @@ url="$(jq -r '.urls[0]' <<<"$entry")"
 sha="$(jq -r --arg f "$file" '.file_integrity[$f].blob_id' <<<"$entry")"
 size="$(jq -r --arg f "$file" '.file_integrity[$f].size_bytes' <<<"$entry")"
 
+# Hash from standard input: given a Windows path, sha256sum escapes its output.
 hash_of() {
-    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi < "$1" | awk '{print $1}'
 }
 
 mkdir -p "$dir"
