@@ -126,11 +126,11 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-build
         with:
-          cache: test-${{ matrix.shard }}
+          cache: test
           components: rustfmt
       - name: Restore the patched llama.cpp build
         id: llama
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ env.LLAMA_CACHE_PATHS }}
           key: llama-static-cpu-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('skippy/llama_cpp/**', 'skippy/scripts/prepare-llama.sh', 'skippy/scripts/build-llama.sh', 'skippy/scripts/build-linux.sh', 'scripts/lib/**') }}
@@ -139,6 +139,12 @@ jobs:
         run: |
           scripts/prepare-llama.sh pinned
           scripts/build-llama.sh
+      - name: Save the patched llama.cpp build
+        if: steps.llama.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ env.LLAMA_CACHE_PATHS }}
+          key: ${{ steps.llama.outputs.cache-primary-key }}
       - name: Check the committed FFI bindings match the llama.cpp headers
         if: matrix.shard == 0
         env:
@@ -158,7 +164,9 @@ jobs:
       - name: Prepare a placeholder console
         run: mkdir -p mesh/crates/mesh-llm-ui/dist && printf '<html></html>' > mesh/crates/mesh-llm-ui/dist/index.html
       - run: ci/simple/test-crates.sh ${{ matrix.shard }} 4
-      - if: ${{ !cancelled() }}
+      # The shards share one compiler cache, saved by the first. GitHub keeps
+      # 10 GB of caches per repository; one per shard would not fit.
+      - if: ${{ !cancelled() && matrix.shard == 0 }}
         uses: ./.github/actions/save-build-cache
 
   build:
@@ -174,7 +182,8 @@ jobs:
           - { name: Linux CPU, runner: ubuntu-24.04, backend: cpu, device: CPU, binary: target/debug/mesh-llm }
           # GitHub's Linux runners have no GPU and MeshLLM does not use software
           # Vulkan drivers, so the Vulkan build is started and answers on the CPU.
-          - { name: Linux Vulkan, runner: ubuntu-24.04, backend: vulkan, device: CPU, binary: target/debug/mesh-llm,
+          # It reads the Linux CPU job's compiler cache and saves none of its own.
+          - { name: Linux Vulkan, runner: ubuntu-24.04, backend: vulkan, cache: cpu, device: CPU, binary: target/debug/mesh-llm,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: macOS Metal, runner: macos-15, backend: metal, device: MTL0, binary: target/debug/mesh-llm }
           - { name: Windows CPU, runner: windows-2025, backend: cpu, device: CPU, binary: target/debug/mesh-llm.exe }
@@ -187,7 +196,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-build
         with:
-          cache: build-${{ matrix.backend }}
+          cache: build-${{ matrix.cache || matrix.backend }}
           node: "true"
           packages: ${{ matrix.packages }}
       - name: Build Skippy, the native runtime, MeshLLM and the console
@@ -202,7 +211,7 @@ jobs:
         run: |
           model="$(ci/simple/fetch-model.sh ci/model-artifacts/manifests/product-smoke.json smollm2-q8-inference "$RUNNER_TEMP/models")"
           ci/simple/smoke.sh "${{ matrix.binary }}" "$model" "${{ matrix.device }}"
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && !matrix.cache }}
         uses: ./.github/actions/save-build-cache
 
   ui:

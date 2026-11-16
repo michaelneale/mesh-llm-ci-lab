@@ -74,8 +74,8 @@ jobs:
           name: release-${{ strategy.job-index }}
           path: dist/*
           if-no-files-found: error
-      - if: ${{ !cancelled() }}
-        uses: ./.github/actions/save-build-cache
+      # Releases are rare and their compiler caches are large, so none is saved:
+      # GitHub keeps 10 GB of caches per repository and CI needs that room.
 
   publish:
     name: Publish the GitHub release
