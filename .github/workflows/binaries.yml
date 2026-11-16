@@ -1,8 +1,16 @@
-# Build the release archive for each platform on GitHub's runners, run the
+# Build the release archives for each platform on GitHub's runners, run the
 # packaged binary once, and attach the archives to a GitHub release.
+#
+# Each platform produces the MeshLLM archive, the native runtime archive that
+# MeshLLM downloads, and the Skippy CLI archive. The release also carries
+# native-runtimes.json, which lists the native runtime archives.
+#
+# To release: set the version in the workspace, merge, then push a v* tag.
 name: Release binaries
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -19,7 +27,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  VERSION: ${{ inputs.version }}
+  VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
   build:
@@ -50,8 +58,15 @@ jobs:
           packages: ${{ matrix.packages }}
       - name: Build the release binaries
         run: just ${{ matrix.recipe }}
-      - name: Package the release archive
-        run: just release-bundle "$VERSION" dist "${{ matrix.flavor }}"
+      - name: Package the release archives
+        run: |
+          just release-bundle "$VERSION" dist "${{ matrix.flavor }}"
+          # The Skippy CLI is the same for every flavour of a platform.
+          if [[ -z "${{ matrix.flavor }}" ]]; then ci/simple/package-skippy-cli.sh "$VERSION" dist; fi
+          # The native runtime archive was written by the build.
+          find dist/native-runtimes -maxdepth 1 -type f -name 'meshllm-native-runtime-*.tar.gz*' -exec mv {} dist/ \;
+          ls -l dist
+          test -s "$(echo dist/meshllm-native-runtime-*.tar.gz)"
       - name: Restore the smoke model
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
@@ -72,7 +87,10 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: release-${{ strategy.job-index }}
-          path: dist/*
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
           if-no-files-found: error
       # Releases are rare and their compiler caches are large, so none is saved:
       # GitHub keeps 10 GB of caches per repository and CI needs that room.
@@ -80,16 +98,27 @@ jobs:
   publish:
     name: Publish the GitHub release
     needs: build
-    if: inputs.publish
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          cache: release-publish
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-*
           path: dist
           merge-multiple: true
+      - name: List the native runtime archives in native-runtimes.json
+        run: |
+          scripts/generate-native-runtime-release-manifest.sh --tag "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --out dist/native-runtimes.json dist/meshllm-native-runtime-*.tar.gz
+          (cd dist && sha256sum native-runtimes.json > native-runtimes.json.sha256)
       - name: Create the release with every archive attached
         env:
           GH_TOKEN: ${{ github.token }}
