@@ -2,6 +2,13 @@
 
 use crate::ci_plan::document::Json;
 use crate::ci_plan::plan_bytes::write_string;
+use std::path::Path;
+
+/// Reads and parses a JSON file with filesystem and JSON diagnostics.
+pub(crate) fn load(path: &Path) -> Result<Json, String> {
+    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+    Json::parse(&bytes).map_err(|error| error.to_string())
+}
 
 /// Stable sorted, ASCII-escaped manifest bytes with two-space indentation.
 pub(crate) fn dumps_indented(value: &Json) -> String {

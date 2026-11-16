@@ -52,6 +52,7 @@ fn run() -> DynResult<()> {
         cli::CliCommand::Artifact(command, rest) => artifact::run(command, rest),
         cli::CliCommand::Native(command, rest) => native_policy::run(command, rest, resolve_root),
         cli::CliCommand::Product(command, rest) => product::run(command, rest),
+        cli::CliCommand::PreparedInput(rest) => prepared_input::run(rest),
         cli::CliCommand::CargoTargetDirectory(rest) => repository::cargo_target_directory(rest),
         cli::CliCommand::ConventionalCommits(rest) => {
             let cwd = match &explicit_root {

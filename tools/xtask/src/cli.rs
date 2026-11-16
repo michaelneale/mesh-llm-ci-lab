@@ -5,6 +5,7 @@ const USAGE: &str = "usage:
   cargo xtool artifact <command> ...
   cargo xtool native <command> ...
   cargo xtool product <command> ...
+  cargo xtool prepared-input <command> ...
   cargo xtool repository cargo-target-directory < cargo-metadata.json
   cargo xtool repository conventional-commits [--message MESSAGE] [--range RANGE] [file]
   cargo xtool repo-consistency no-console-print
@@ -23,6 +24,7 @@ pub(crate) enum CliCommand<'a> {
     Artifact(crate::artifact::ArtifactCommand, &'a [String]),
     Native(crate::native_policy::NativeCommand, &'a [String]),
     Product(crate::product::ProductCommand, &'a [String]),
+    PreparedInput(&'a [String]),
     CargoTargetDirectory(&'a [String]),
     ConventionalCommits(&'a [String]),
     NoConsolePrint(&'a [String]),
@@ -53,6 +55,7 @@ impl<'a> Cli<'a> {
                     None => return Err(USAGE.into()),
                 }
             }
+            [domain, rest @ ..] if domain == "prepared-input" => CliCommand::PreparedInput(rest),
             [domain, scope, rest @ ..]
                 if domain == "repository" && scope == "cargo-target-directory" =>
             {

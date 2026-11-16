@@ -179,6 +179,8 @@ jobs:
           if [[ -z "${{ matrix.flavor }}" ]]; then
             ci/simple/package-skippy-cli.sh "$VERSION" dist
             ci/simple/package-node-addon.sh "$VERSION" dist
+            # The native SDK is released for macOS and Linux.
+            [[ "$RUNNER_OS" == Windows ]] || ci/simple/package-native-sdk.sh dist
           fi
           # The native runtime archive was written by the build.
           find "$runtimes" -maxdepth 1 -type f -name 'meshllm-native-runtime-*.tar.gz*' -exec mv {} dist/ \;
