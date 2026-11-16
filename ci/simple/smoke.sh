@@ -35,6 +35,16 @@ for _ in $(seq 1 300); do
 done
 [[ "${ready:-}" == 1 ]] || fail "no model was listed within 300 seconds"
 
+# A GPU archive started without a card must still have its GPU library loaded.
+if [[ -n "${SMOKE_LOADED:-}" ]]; then
+    if [[ "$OSTYPE" == linux* ]]; then
+        grep -q "$SMOKE_LOADED" "/proc/$pid/maps"
+    else
+        tasklist //m "$SMOKE_LOADED.dll" | grep -qi mesh-llm
+    fi || fail "$SMOKE_LOADED is not loaded in mesh-llm"
+    echo "$SMOKE_LOADED is loaded in mesh-llm"
+fi
+
 name="$(curl -fsS "http://127.0.0.1:$port/v1/models" | jq -r '.data[0].id')"
 request="$(jq -cn --arg model "$name" \
     '{model: $model, max_tokens: 16, messages: [{role: "user", content: "Say hello."}]}')"

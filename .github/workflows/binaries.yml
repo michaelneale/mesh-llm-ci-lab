@@ -49,8 +49,8 @@ jobs:
           - { name: Linux x86_64 Vulkan, runner: ubuntu-24.04, recipe: release-build-vulkan, flavor: vulkan, device: CPU,
               packages: libvulkan-dev glslc spirv-headers mesa-vulkan-drivers vulkan-tools }
           - { name: Windows x86_64, runner: windows-2025, recipe: release-build, device: CPU }
-          # GitHub's runners have no NVIDIA or AMD card, so the CUDA and ROCm
-          # archives are built and packaged here but not started.
+          # GitHub's runners have no NVIDIA or AMD card: the GPU archives are
+          # built and packaged here, and started by the next job.
           - { name: Linux x86_64 CUDA 12, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 12-9,
               cuda_archs: "61;75;80;86;87;89;90" }
           - { name: Linux x86_64 CUDA 13, runner: ubuntu-24.04, recipe: release-build-cuda, flavor: cuda, cuda: 13-1 }
@@ -238,7 +238,7 @@ jobs:
           ci/simple/smoke.sh "$binary" "$model" "${{ matrix.device }}"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: release-${{ strategy.job-index }}
+          name: release-${{ matrix.name }}
           # The archives are already compressed.
           compression-level: 0
           path: |
@@ -250,9 +250,97 @@ jobs:
       # Releases are rare and their compiler caches are large, so none is saved:
       # GitHub keeps 10 GB of caches per repository and CI needs that room.
 
+  # GitHub's runners have no NVIDIA or AMD card, so a GPU archive cannot compute
+  # there. Each one is still unpacked on a clean runner, given the vendor's
+  # driver library, and started with MeshLLM told a matching card is present:
+  # its GPU runtime must load and answer a chat on CPU. That catches an archive
+  # that is incomplete or does not load. That the GPU code computes is shown
+  # only on a real card.
+  start-without-card:
+    name: Start ${{ matrix.name }} without a card
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux x86_64 CUDA 12, runner: ubuntu-24.04, cuda: 12-9 }
+          - { name: Linux x86_64 CUDA 13, runner: ubuntu-24.04, cuda: 13-1 }
+          - { name: Linux arm64 CUDA 12, runner: ubuntu-24.04-arm, cuda: 12-9 }
+          - { name: Linux arm64 CUDA 13, runner: ubuntu-24.04-arm, cuda: 13-1 }
+          - { name: Linux x86_64 ROCm, runner: ubuntu-24.04, rocm: "7.0" }
+          - { name: Windows x86_64 Vulkan, runner: windows-2022, windows_vulkan: 1.4.328.1 }
+          - { name: Windows x86_64 CUDA 12, runner: windows-2022, windows_nvidia_driver: "581.57" }
+          - { name: Windows x86_64 CUDA 13, runner: windows-2022 }
+          - { name: Windows x86_64 ROCm, runner: windows-2022 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ matrix.name }}
+          path: dist
+      - name: Install NVIDIA's Linux driver library, which needs no card
+        if: matrix.cuda
+        run: |
+          [[ "$(dpkg --print-architecture)" == arm64 ]] && repo=sbsa || repo=x86_64
+          curl -fsSLO --retry 5 --retry-all-errors "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/$repo/cuda-keyring_1.1-1_all.deb"
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends "cuda-compat-${{ matrix.cuda }}"
+          echo "LD_LIBRARY_PATH=$(dirname "$(dpkg -L "cuda-compat-${{ matrix.cuda }}" | grep -m1 'libcuda.so.1$')")" >> "$GITHUB_ENV"
+      - name: Install AMD's ROCm libraries, which the archive expects on the machine
+        if: matrix.rocm
+        run: |
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/rocm.key" https://repo.radeon.com/rocm/rocm.gpg.key
+          sudo gpg --dearmor -o /etc/apt/keyrings/rocm.gpg "$RUNNER_TEMP/rocm.key"
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/${{ matrix.rocm }} noble main" |
+            sudo tee /etc/apt/sources.list.d/rocm.list
+          printf 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600\n' |
+            sudo tee /etc/apt/preferences.d/rocm-pin-600
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends hip-runtime-amd hipblas rocblas
+          echo "LD_LIBRARY_PATH=/opt/rocm/lib" >> "$GITHUB_ENV"
+      - name: Take the Vulkan loader from the Vulkan runtime
+        if: matrix.windows_vulkan
+        run: |
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/vulkan.zip" \
+            "https://sdk.lunarg.com/sdk/download/${{ matrix.windows_vulkan }}/windows/VulkanRT-X64-${{ matrix.windows_vulkan }}-Components.zip"
+          unzip -q -j "$RUNNER_TEMP/vulkan.zip" '*/x64/vulkan-1.dll' -d "$RUNNER_TEMP/driver"
+          cygpath -w "$RUNNER_TEMP/driver" >> "$GITHUB_PATH"
+      - name: Take NVIDIA's Windows driver library out of the driver package
+        if: matrix.windows_nvidia_driver
+        run: |
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/nvidia.exe" \
+            "https://us.download.nvidia.com/Windows/${{ matrix.windows_nvidia_driver }}/${{ matrix.windows_nvidia_driver }}-desktop-win10-win11-64bit-international-dch-whql.exe"
+          7z e -y -o"$RUNNER_TEMP/driver" "$RUNNER_TEMP/nvidia.exe" 'Display.Driver/nvcuda64.dll' > /dev/null
+          mv "$RUNNER_TEMP/driver/nvcuda64.dll" "$RUNNER_TEMP/driver/nvcuda.dll"
+          cygpath -w "$RUNNER_TEMP/driver" >> "$GITHUB_PATH"
+      - name: Restore the smoke model
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/models
+          key: smoke-model-${{ hashFiles('ci/model-artifacts/manifests/product-smoke.json') }}
+          enableCrossOsArchive: true
+      - name: Load the GPU runtime and complete a chat on CPU
+        run: |
+          archive="$(find dist -maxdepth 1 -type f -name "mesh-llm-$VERSION-*" ! -name '*.sha256')"
+          mkdir -p "$RUNNER_TEMP/product"
+          case "$archive" in
+            *.zip) unzip -q "$archive" -d "$RUNNER_TEMP/product" ;;
+            *) tar -xzf "$archive" -C "$RUNNER_TEMP/product" ;;
+          esac
+          model="$(ci/simple/fetch-model.sh ci/model-artifacts/manifests/product-smoke.json smollm2-q8-inference "$RUNNER_TEMP/models")"
+          ci/simple/smoke-no-card.sh "$RUNNER_TEMP/product" "$model"
+
   publish:
     name: Publish the GitHub release
-    needs: build
+    needs: [build, start-without-card]
     if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-24.04
     permissions:
