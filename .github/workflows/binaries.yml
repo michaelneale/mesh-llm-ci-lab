@@ -5,7 +5,10 @@
 # MeshLLM downloads, and the Skippy CLI archive. The release also carries
 # native-runtimes.json, which lists the native runtime archives.
 #
-# To release: set the version in the workspace, merge, then push a v* tag.
+# To release: `just release v1.2.3`. It starts this workflow, which sets that
+# version in the source, builds and tests the archives, and then commits the
+# version change to main, tags it and publishes. Pushing a v* tag whose source
+# already carries the version does the same.
 name: Release binaries
 
 on:
@@ -14,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to publish, matching the workspace version (v0.80.0).
+        description: Version to release (v1.2.3).
         required: true
         type: string
       publish:
@@ -60,6 +63,8 @@ jobs:
           cache: ${{ matrix.recipe }}-${{ matrix.flavor || 'default' }}
           node: "true"
           packages: ${{ matrix.packages }}
+      - name: Set the version being released
+        run: scripts/release-version.sh "$VERSION"
       - name: Install NVIDIA's CUDA toolkit
         if: matrix.cuda
         env:
@@ -125,9 +130,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The checkout keeps its credentials: this job pushes the tag.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          persist-credentials: false
       - uses: ./.github/actions/setup-build
         with:
           cache: release-publish
@@ -141,7 +145,23 @@ jobs:
           scripts/generate-native-runtime-release-manifest.sh --tag "$VERSION" --repo "$GITHUB_REPOSITORY" \
             --out dist/native-runtimes.json dist/meshllm-native-runtime-*.tar.gz
           (cd dist && sha256sum native-runtimes.json > native-runtimes.json.sha256)
+      - name: Commit the version, tag it, and push both
+        if: github.ref_type != 'tag'
+        run: |
+          scripts/release-version.sh "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --update
+          git diff --cached --quiet || git commit -q -m "$VERSION: prepare release source"
+          git tag "$VERSION"
+          git push origin "refs/tags/$VERSION"
+          # The branch may have moved while the archives were being built.
+          git push origin "HEAD:$GITHUB_REF" || {
+            git fetch origin "$GITHUB_REF"
+            git rebase FETCH_HEAD
+            git push origin "HEAD:$GITHUB_REF"
+          }
       - name: Create the release with every archive attached
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
+        run: gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes

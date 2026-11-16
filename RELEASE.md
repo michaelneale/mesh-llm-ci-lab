@@ -4,7 +4,7 @@
 
 When `main` requires pull requests and successful checks, prepare the release
 version in a PR before dispatching the **Release** workflow
-(`.github/workflows/release.yml`). `scripts/release-version.sh` is the single
+(`.github/workflows/binaries.yml`). `scripts/release-version.sh` is the single
 version authority. From a release-preparation branch, run:
 
 ```bash

@@ -4,14 +4,16 @@ set -euo pipefail
 
 usage() {
     cat >&2 <<'EOF'
-usage: scripts/release.sh <version|vversion> [--skip-gpu-bundles] [--canary]
+usage: scripts/release.sh <version|vversion> [--canary]
 
 Runs a synchronous release from main:
   1. verifies gh and the local git state
-  2. dispatches .github/workflows/release.yml
+  2. dispatches .github/workflows/binaries.yml
   3. lets the workflow commit and push the canonical version bump
   4. watches the GitHub Actions run until it succeeds or fails
   5. verifies the release and origin/main version
+
+--canary builds and tests every archive without publishing anything.
 
 The command requires the current branch to be main and up to date with
 origin/main before it starts.
@@ -52,25 +54,10 @@ read_workspace_version() {
 ensure_target_version_not_older() {
     local current="$1"
     local target="$2"
-    local compare_status
 
-    if cargo xtool release version-at-least "$current" "$target"
-    then
-        compare_status=0
-    else
-        compare_status="$?"
+    if [[ "$(printf '%s\n%s\n' "$current" "$target" | sort -V | tail -n 1)" != "$target" ]]; then
+        die "target version $target must not be older than current workspace version $current"
     fi
-
-    case "$compare_status" in
-        0)
-            ;;
-        1)
-            die "target version $target must not be older than current workspace version $current"
-            ;;
-        *)
-            die "failed to compare current version $current and target version $target"
-            ;;
-    esac
 }
 
 ensure_clean_worktree() {
@@ -98,7 +85,7 @@ ensure_github_release_preflight() {
     local tag="$1"
 
     gh auth status >/dev/null 2>&1 || die "gh must be authenticated before release"
-    gh workflow view release.yml >/dev/null 2>&1 || die "GitHub Release workflow release.yml is not available"
+    gh workflow view binaries.yml >/dev/null 2>&1 || die "GitHub Release workflow binaries.yml is not available"
 
     if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
         die "local tag $tag already exists"
@@ -115,21 +102,19 @@ confirm_release() {
     local tag="$1"
     local version="$2"
     local current_version="$3"
-    local skip_gpu_bundles="$4"
-    local canary="$5"
+    local canary="$4"
     local answer
 
     cat <<EOF
 This will:
   - verify the current branch is clean, local main, and equal to origin/main
-  - dispatch .github/workflows/release.yml for $tag
-  - for a non-canary release, let the workflow update source files from $current_version to $version
+  - dispatch .github/workflows/binaries.yml for $tag
+  - build and test every archive with source files updated from $current_version to $version
   - for a non-canary release, let the workflow commit and push "$tag: prepare release source" to origin/main
   - watch the GitHub Actions release run until it succeeds or fails
-  - publish $tag with GitHub-generated release notes after all release checks pass
+  - publish $tag with GitHub-generated release notes after every archive is built and tested
 
 Options:
-  - skip GPU bundles: $skip_gpu_bundles
   - canary: $canary
 
 Continue? y/N
@@ -146,15 +131,15 @@ EOF
 
 dispatch_release_workflow() {
     local tag="$1"
-    local skip_gpu_bundles="$2"
-    local canary="$3"
+    local canary="$2"
+    local publish="true"
 
+    [[ "$canary" == "true" ]] && publish="false"
     echo "Dispatching Release workflow for $tag..." >&2
-    gh workflow run release.yml \
+    gh workflow run binaries.yml \
         --ref main \
         --raw-field "version=$tag" \
-        --raw-field "skip_gpu_bundles=$skip_gpu_bundles" \
-        --raw-field "canary=$canary"
+        --field "publish=$publish"
 }
 
 workflow_run_id_from_url() {
@@ -174,7 +159,7 @@ find_dispatched_release_run_id() {
     for _ in {1..30}; do
         run_id="$(
             gh run list \
-                --workflow release.yml \
+                --workflow binaries.yml \
                 --branch main \
                 --commit "$release_sha" \
                 --event workflow_dispatch \
@@ -219,14 +204,10 @@ main() {
     local raw_version="$1"
     shift
 
-    local skip_gpu_bundles="false"
     local canary="false"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --skip-gpu-bundles)
-                skip_gpu_bundles="true"
-                ;;
             --canary)
                 canary="true"
                 ;;
@@ -245,7 +226,6 @@ main() {
     require_command gh
     require_command git
     require_command perl
-    require_command cargo
 
     local version
     local tag
@@ -262,7 +242,7 @@ main() {
     ensure_target_version_not_older "$current_version" "$version"
     ensure_github_release_preflight "$tag"
 
-    confirm_release "$tag" "$version" "$current_version" "$skip_gpu_bundles" "$canary"
+    confirm_release "$tag" "$version" "$current_version" "$canary"
 
     local dispatch_sha
     local dispatch_started_at
@@ -270,7 +250,7 @@ main() {
     local run_id
     dispatch_sha="$(git rev-parse origin/main)"
     dispatch_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    run_url="$(dispatch_release_workflow "$tag" "$skip_gpu_bundles" "$canary")"
+    run_url="$(dispatch_release_workflow "$tag" "$canary")"
     run_id="$(workflow_run_id_from_url "$run_url")"
     if [[ -z "$run_id" ]]; then
         run_id="$(find_dispatched_release_run_id "$dispatch_sha" "$dispatch_started_at")"
