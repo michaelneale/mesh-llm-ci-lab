@@ -46,8 +46,9 @@ already carries the version does the same.
 For each platform the workflow runs the release recipe (`just release-build…`)
 and packages with `just release-bundle`. Each platform produces the MeshLLM
 archive, the native runtime archive MeshLLM downloads, the Skippy CLI archive
-and the Node SDK addon. The release also carries `native-runtimes.json`, which
-lists the native runtime archives.
+and the Node SDK addon. macOS and Linux also produce the native SDK archive and
+its Rust crate. The release also carries `native-runtimes.json`, which lists the
+native runtime archives. The Swift framework is not built here.
 
 | Platform | Archives | Checked before publishing |
 | --- | --- | --- |
