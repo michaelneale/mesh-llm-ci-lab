@@ -34,8 +34,9 @@ workflow but are not executed anywhere in CI.
 GitHub keeps 10 GB of caches per repository. Only main saves caches; pull
 requests read them. `setup-build` restores one compiler cache per job and
 `save-build-cache` saves it, keeping only the objects that job used so a cache
-does not grow from run to run. The test shards share one cache and the Vulkan
-build reads the Linux CPU cache, so the whole set fits.
+does not grow from run to run. Each push to main saves a new cache per job, and
+the last job of the run deletes the ones it replaced. The test shards share one
+cache and the Vulkan build reads the Linux CPU cache, so the whole set fits.
 
 ## Releases: `.github/workflows/binaries.yml`
 
