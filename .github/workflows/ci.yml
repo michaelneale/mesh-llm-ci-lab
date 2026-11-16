@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  # save-build-cache deletes the cache it replaces.
+  actions: write
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
@@ -287,25 +289,3 @@ jobs:
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$RESULTS"
           jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<<"$RESULTS" >/dev/null
           jq -e '.changes.result == "success"' <<<"$RESULTS" >/dev/null
-
-  # Each push to main saves a new compiler cache per job. Drop the ones it
-  # replaced, so the repository stays under GitHub's 10 GB.
-  caches:
-    name: Drop replaced compiler caches
-    needs: [clippy, test, build, website]
-    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      actions: write
-    steps:
-      - name: Keep the newest compiler cache of each job
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh cache list --repo "$GITHUB_REPOSITORY" --ref refs/heads/main --key build- --limit 100 --json id,key,createdAt \
-            --jq 'group_by(.key | sub("-[0-9a-f]{40}$"; "")) | .[] | sort_by(.createdAt) | .[:-1][] | "\(.id) \(.key)"' |
-            while read -r id key; do
-              echo "dropping $key"
-              gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
-            done
