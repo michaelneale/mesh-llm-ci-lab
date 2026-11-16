@@ -7,11 +7,7 @@ metadata:
 
 # HF Quant And Layer Package Jobs
 
-New repository-side job planning and orchestration follows
-`../manage-ci/SKILL.md`: no new Python tooling; use typed `tools/xtask`
-commands behind thin Just recipes. From the repository root,
-`cargo xtool repo-consistency ci-crate-lists` is a working alias example, not
-a quantization or packaging command. The combined native quant Jobs route uses
+Do not add Python tooling for repository-side job planning. The combined native quant Jobs route uses
 the existing `model-package-generic-jobs` facade and
 `automation hf-certify quant-job-worker`.
 See [the operator contract](../../../skippy/docs/HF_QUANTIZATION_JOBS.md).

@@ -5,11 +5,7 @@ description: Use when creating, monitoring, validating, or documenting low-memor
 
 # HF GGUF Quant Jobs
 
-New repository-side job planning and orchestration follows
-`../manage-ci/SKILL.md`: no new Python tooling; use typed `tools/xtask`
-commands behind thin Just recipes. From the repository root,
-`cargo xtool repo-consistency ci-crate-lists` is a working alias example, not
-a job planner. Native quant Jobs use the existing
+Do not add Python tooling for repository-side job planning. Native quant Jobs use the existing
 `model-package-generic-jobs` facade and
 `automation hf-certify quant-job-worker`. See
 [the operator contract](../../../skippy/docs/HF_QUANTIZATION_JOBS.md).

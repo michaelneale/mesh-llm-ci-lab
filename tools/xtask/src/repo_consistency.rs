@@ -85,3 +85,42 @@ pub(crate) fn workspace_metadata(repo_root: &Path, context: &str) -> DynResult<C
     }
     Ok(serde_json::from_slice(&output.stdout)?)
 }
+
+#[cfg(test)]
+mod runtime_event_abi_mirror {
+    use std::fs;
+    use std::path::Path;
+
+    /// Field names, in declaration order, of the struct opened by `declaration`.
+    fn field_names(source: &str, declaration: &str) -> Vec<String> {
+        let (_, rest) = source
+            .split_once(declaration)
+            .unwrap_or_else(|| panic!("missing `{declaration}`"));
+        let (body, _) = rest.split_once("\n}").expect("struct should close");
+        body.lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .filter_map(|line| line.strip_prefix("pub ").unwrap_or(line).split_once(':'))
+            .map(|(name, _)| name.trim().to_string())
+            .collect()
+    }
+
+    /// mesh-llm-runtime-event-contracts is published on its own, so its test
+    /// fixture copies the native event struct instead of reading skippy-ffi.
+    /// This keeps the copy in step with the generated bindings.
+    #[test]
+    fn fixture_matches_the_native_event_struct() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let read = |path: &str| fs::read_to_string(root.join(path)).expect(path);
+        let native = field_names(
+            &read("skippy/crates/skippy-ffi/src/bindings/skippy.rs"),
+            "pub struct skippy_runtime_event_v1 {",
+        );
+        let fixture = field_names(
+            &read("mesh/crates/mesh-llm-runtime-event-contracts/src/tests/native.rs"),
+            "struct RawNativeEventV1Fixture {",
+        );
+        assert!(!native.is_empty());
+        assert_eq!(native, fixture);
+    }
+}

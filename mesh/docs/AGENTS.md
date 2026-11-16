@@ -1,10 +1,5 @@
 # Agents And Blackboard
 
-Repository QA automation follows `.agents/skills/manage-ci/SKILL.md`: add no
-new Python tooling; use typed `tools/xtask` commands behind thin Just recipes.
-From the repository root, `cargo xtool repo-consistency ci-crate-lists` is an
-existing example.
-
 Mesh LLM exposes an OpenAI-compatible API on `http://localhost:9337/v1`, so most agent tools can talk to it directly.
 
 `/v1/models` lists the models currently available on the mesh. Requests are routed by the `model` field.

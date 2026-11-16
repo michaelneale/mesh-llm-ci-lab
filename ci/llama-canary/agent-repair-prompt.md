@@ -12,12 +12,8 @@ When the stage ABI changes, also read
 queue reconstruction, ABI, and validation rules are requirements.
 
 Do not write new Python tooling during repair, including temporary or inline
-helpers. Follow `.agents/skills/manage-ci/SKILL.md` for new repository
-automation in typed `tools/xtask` commands; from the repository root,
-`cargo xtool repo-consistency ci-crate-lists` is an existing alias example.
-The existing patch generator remains transitional until an equivalent Rust
-command passes parity checks. This does not grant permission to edit the trusted
-scripts or CI boundary listed below.
+helpers. This does not grant permission to edit the trusted scripts or CI
+boundary listed below.
 
 Work in this order. Stop as soon as the focused repair check passes:
 

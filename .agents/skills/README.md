@@ -1,11 +1,7 @@
 # Repo Agent Skills
 
-New skill-local tooling follows the Rust automation rule in
-`manage-ci/SKILL.md`: no new Python helpers, including temporary or inline
-scripts. Extend typed `tools/xtask` commands instead; run an existing check
-from the repository root with `cargo xtool repo-consistency ci-crate-lists`.
-Existing Python-backed instructions remain transitional until their owners
-port and verify them.
+Skill-local tooling adds no Python helpers, including temporary or inline
+scripts. Prefer a `just` recipe or a small shell script.
 
 Skills under `.agents/skills/` are the canonical repo-local skills and are
 auto-picked-up by agents working in this repo. Each is a focused, current

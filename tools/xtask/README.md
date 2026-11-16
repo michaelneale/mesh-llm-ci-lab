@@ -1,36 +1,17 @@
 # xtask
 
-`xtask` is the workspace's internal Rust command runner for repository and
-release checks. It is not published as a library. Root `just` recipes and CI
-invoke it for crate-list, publish-chain, release-target, and console-output
-consistency checks, and for release attestation operations.
+`xtask` is the small Rust command runner the build, CI and release scripts
+call. It is not published. Run it from the workspace root as
+`cargo xtool <domain> <command>`; `cargo xtool --help` lists the commands.
 
-CI planning, lane result admission, the planner-side repository checks, and
-`automation bootstrap` live in [ci-controller](../ci-controller/README.md).
-xtask keeps those commands and delegates them to the controller library, so
-their output and exit codes are unchanged.
+| Domain | Called by | What it does |
+| --- | --- | --- |
+| `artifact` | `skippy/scripts/prepare-llama.sh` | Hashes the llama.cpp inputs. |
+| `native` | Native runtime and release packaging scripts | Writes and checks native runtime manifests and the system libraries a binary needs. |
+| `product` | `mesh/scripts/package-release.sh`, `.ps1` | Composes and archives the release product. |
+| `release-attestation` | Release packaging | Stamps and inspects the signed release footer. |
+| `repository` | `just`, the commit hook, CI | Checks commit and pull request titles; resolves Cargo's target directory. |
+| `repo-consistency no-console-print` | `just no-console-print` | Forbids direct printing in product code. |
 
-`models resolve`, `models restore-inputs`, `ci-ops authority-audit`,
-`ci-ops pr-authority-audit`, and `artifact file-projection` live in
-[authority-automation](../authority-automation/README.md), the executable the
-protected authority producers publish. xtask delegates them the same way.
-
-`ci-ops runner-cleanup` lives in [runner-cleanup](../runner-cleanup/README.md), the
-executable the trusted runner-image job freezes for cleanup. xtask delegates it
-the same way.
-
-From the workspace root, run the repository checks through `just`:
-
-```bash
-just ci-crate-lists
-just publish-crates
-just check-release
-just no-console-print
-```
-
-The canonical direct interface is `cargo xtool <domain> <command> [options]`.
-For example, run `just with-lld cargo xtool repo-consistency ci-crate-lists`;
-`just with-lld cargo xtool --help` lists the command syntax. The transition
-interface `cargo run -p xtask --` remains compatible. Keep build and required
-validation entrypoints in their owning Just recipes. New repository automation
-belongs in typed Rust owners, not new Python tooling or generic shell policy.
+Keep it to what those callers need. CI steps belong in `just` recipes or
+`ci/simple/` scripts, not here.

@@ -7,12 +7,8 @@ metadata:
 
 # HF Layer Package Jobs
 
-New repository-side job planning and orchestration follows
-`../manage-ci/SKILL.md`: no new Python tooling; use typed `tools/xtask`
-commands behind thin Just recipes. From the repository root,
-`cargo xtool repo-consistency ci-crate-lists` is a working alias example, not
-a packaging command. Existing Hugging Face Jobs examples remain transitional
-ecosystem invocations, not approval for new Python automation.
+Existing Hugging Face Jobs examples are ecosystem invocations, not approval
+for new Python automation in this repository.
 
 Use this skill for the `models package` CLI, the `skippy-model-package` crate, and the
 daily Unsloth queue workflow. This skill starts after a quantized GGUF artifact

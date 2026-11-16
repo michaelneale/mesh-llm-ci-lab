@@ -9,15 +9,12 @@ use crate::{
 // published `mesh-llm-runtime-event-contracts` tarball contains only this
 // crate's own package root — an `include_str!` reaching into the sibling
 // `skippy-ffi` crate's source would fail to compile for any downstream
-// consumer of the published crate (enforced by
-// `tools/xtask/src/publish_consistency.rs`'s literal-include package-root
-// check). The equivalent assertion instead runs from the repo's dev-only
-// `xtask` binary, which is free to read across crate boundaries:
-// `tools/xtask/src/repo_consistency.rs::check_runtime_event_abi_mirror`,
-// invoked by `cargo run -p xtask -- repo-consistency ci-crate-lists` (`just
-// ci-crate-lists`). Keep this struct's field names and order exactly in
-// sync with `SkippyRuntimeEventV1` — the xtask check parses both structs as
-// text and fails loudly if they diverge.
+// consumer of the published crate. The equivalent assertion instead runs as an
+// `xtask` test, which is free to read across crate boundaries:
+// `runtime_event_abi_mirror` in `tools/xtask/src/repo_consistency.rs`, run by
+// `cargo test -p xtask`. Keep this struct's field names and order exactly in
+// sync with `SkippyRuntimeEventV1` — the test parses both structs as text and
+// fails if they diverge.
 struct RawNativeEventV1Fixture {
     abi_version: u32,
     struct_size: u32,
