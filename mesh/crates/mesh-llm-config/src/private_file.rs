@@ -149,17 +149,15 @@ fn reject_link_or_special(target: &Path) -> io::Result<()> {
 }
 
 fn is_link_or_reparse_point(metadata: &fs::Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
     #[cfg(windows)]
-    {
+    let reparse_point = {
         use std::os::windows::fs::MetadataExt;
         const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
         metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    }
+    };
     #[cfg(not(windows))]
-    false
+    let reparse_point = false;
+    metadata.file_type().is_symlink() || reparse_point
 }
 
 pub(crate) fn create_private_dirs(dir: &Path) -> io::Result<()> {
