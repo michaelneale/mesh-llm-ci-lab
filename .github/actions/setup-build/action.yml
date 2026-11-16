@@ -2,13 +2,17 @@ name: Set up build tools
 description: >
   Everything a job needs before it can run cargo or just in this repository:
   Rust, just, sccache (the repository Cargo config requires it), and the
-  platform linker. The compiler cache is shared through the Actions cache.
+  platform linker. Restores the compiler cache for the job named by `cache`;
+  the job saves it again on main with save-build-cache.
 
 inputs:
   components:
     description: Extra rustup components, comma separated.
     required: false
     default: ""
+  cache:
+    description: Name of the compiler cache this job shares, usually the job name.
+    required: true
   node:
     description: Also install Node and pnpm, for jobs that build the console.
     required: false
@@ -26,22 +30,44 @@ runs:
       if: runner.os == 'Windows'
       uses: ./.github/actions/setup-windows-short-paths
 
+    # One pinned compiler everywhere, so a new Rust release cannot turn CI red
+    # on its own. Bump it in a pull request.
     - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-20
       with:
+        toolchain: 1.100.0
         components: ${{ inputs.components }}
 
     - uses: taiki-e/install-action@3d23c1bbdafe696dfccad2664945a04f47d03dc3 # just
 
     - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
-    - name: Share the compiler cache through the Actions cache
+    # sccache keeps its cache in one directory, saved and restored as a single
+    # Actions cache entry. Its per-object Actions backend is rate limited.
+    - name: Configure the compiler cache
       shell: bash
+      env:
+        CACHE: ${{ inputs.cache }}
+        LOCK_HASH: ${{ hashFiles('Cargo.lock') }}
       run: |
+        if [[ -z "${SCCACHE_DIR:-}" ]]; then
+          echo "SCCACHE_DIR=$HOME/.cache/sccache-ci" >> "$GITHUB_ENV"
+        fi
         {
-          echo "SCCACHE_GHA_ENABLED=true"
+          echo "SCCACHE_CACHE_SIZE=4G"
           echo "RUSTC_WRAPPER=sccache"
           echo "CARGO_INCREMENTAL=0"
+          echo "BUILD_CACHE_PREFIX=build-$RUNNER_OS-$RUNNER_ARCH-$CACHE-"
+          echo "BUILD_CACHE_KEY=build-$RUNNER_OS-$RUNNER_ARCH-$CACHE-$LOCK_HASH-$GITHUB_SHA"
         } >> "$GITHUB_ENV"
+
+    - name: Restore the compiler cache
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: ${{ env.SCCACHE_DIR }}
+        key: ${{ env.BUILD_CACHE_KEY }}
+        restore-keys: |
+          ${{ env.BUILD_CACHE_PREFIX }}${{ hashFiles('Cargo.lock') }}-
+          ${{ env.BUILD_CACHE_PREFIX }}
 
     - name: Install Linux linkers
       if: runner.os == 'Linux'
