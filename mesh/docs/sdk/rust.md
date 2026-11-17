@@ -29,7 +29,7 @@ oldest observation; callers choose a freshness policy for long-running inference
 
 ```toml
 [dependencies]
-mesh-llm-sdk = { version = "0.80.1" }
+mesh-llm-sdk = { version = "0.80.2" }
 ```
 
 Native discovery returns one entry per provider and serving ID. Its
